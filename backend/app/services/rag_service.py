@@ -39,7 +39,7 @@ OUT_OF_SCOPE_MESSAGE = (
 # "is there a nodule in this CT?" but not "does the analyzer perform image reading?".
 _OUT_OF_SCOPE_RE = re.compile(
     r"(결절|병변|종양|암\s*(이|인지|일까|여부)|악성|양성인지|"
-    r"진단(해|을\s*내려|명)|판독(해|해줘|결과를\s*알려)|소견(을|이)\s*(알려|뭐)|"
+    r"진단(해|을\s*내려|명)|판독\s*(해|결과|소견)|소견(을|이)\s*(알려|뭐)|"
     r"처방|투약|복용|용량을|치료\s*(방법|법|해야)|어떤\s*약)"
 )
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")

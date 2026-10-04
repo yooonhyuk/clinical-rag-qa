@@ -104,14 +104,12 @@ async def run_provider(
         await container.aclose()
 
 
-def _fmt(value: Any) -> str:
+def _fmt(key: str, value: Any) -> str:
     if value is None:
         return "-"
-    if isinstance(value, float) and value <= 1.0:
-        return f"{value:.1%}"
-    if isinstance(value, float):
+    if key.endswith(("_ms_p50", "_ms_p95")) or key.endswith("_total"):
         return f"{value:,.0f}"
-    return str(value)
+    return f"{value:.1%}"
 
 
 def render_report(config: dict[str, Any], outcomes: list[EvalOutcome], run_at: str) -> str:
@@ -125,9 +123,14 @@ def render_report(config: dict[str, Any], outcomes: list[EvalOutcome], run_at: s
         "",
         "## Metrics",
         "",
+        *(
+            [f"> INCOMPLETE: {summary['errors']} question(s) errored; metrics cover the rest", ""]
+            if summary["errors"]
+            else []
+        ),
         "| Metric | Value |",
         "|---|---|",
-        *(f"| {label} | {_fmt(summary[key])} |" for key, label in METRIC_LABELS.items()),
+        *(f"| {label} | {_fmt(key, summary[key])} |" for key, label in METRIC_LABELS.items()),
         f"| Questions / errors | {summary['questions']} / {summary['errors']} |",
         "",
         "## Failed questions",

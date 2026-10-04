@@ -1,0 +1,40 @@
+# Closed-network (폐쇄망) override:
+#   docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d
+#
+# - db / ollama / api are attached ONLY to an `internal: true` network: no route to the
+#   internet, and no published host ports.
+# - ui additionally joins `ui_edge` because Docker cannot publish a host port from an
+#   internal-only network. The UI only talks to the api; see README "제한 사항".
+# - images must already be loaded (`docker load`); nothing is pulled or built.
+# - the external LLM provider is forced off.
+
+services:
+  db:
+    pull_policy: never
+    networks: [internal_only]
+    ports: !reset []
+
+  ollama:
+    pull_policy: never
+    networks: [internal_only]
+    ports: !reset []
+
+  api:
+    pull_policy: never
+    build: !reset null
+    networks: [internal_only]
+    ports: !reset []
+    environment:
+      LLM_PROVIDER: ollama
+      ALLOW_EXTERNAL_LLM: "false"
+      ANTHROPIC_API_KEY: ""
+
+  ui:
+    pull_policy: never
+    build: !reset null
+    networks: [internal_only, ui_edge]
+
+networks:
+  internal_only:
+    internal: true
+  ui_edge: {}

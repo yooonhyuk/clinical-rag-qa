@@ -1,0 +1,83 @@
+# ClinicalRAG QA — developer entry points. Run from the repository root.
+UV      := uv run --project backend
+RUFF    := $(UV) ruff
+COMPOSE := docker compose
+OFFLINE := docker compose -f docker-compose.yml -f docker-compose.offline.yml
+LLM_MODEL       ?= gemma4:e4b
+EMBEDDING_MODEL ?= nomic-embed-text
+# `make eval` runs on the host against the compose stack's published ports.
+EVAL_DATABASE_URL ?= postgresql+asyncpg://clinical:clinical@localhost:5432/clinical_rag_qa
+EVAL_OLLAMA_URL   ?= http://localhost:11434
+
+.PHONY: help setup samples seed lint format test test-unit test-integration \
+        up down logs pull-models migrate index eval api ui bundle offline-up verify-offline
+
+help:  ## list targets
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-18s %s\n",$$1,$$2}'
+
+setup:  ## install all Python deps (api + ui + dev) with uv
+	uv sync --project backend --all-groups
+
+samples:  ## regenerate synthetic DICOM + sample PDF
+	$(UV) python scripts/generate_sample_dicom.py
+	$(UV) python scripts/generate_sample_pdf.py
+
+seed:  ## copy sample docs (incl. .corpus.yaml marker) and DICOM into data/raw-docs
+	mkdir -p data/raw-docs/documents data/raw-docs/dicom
+	cp -R samples/documents/. data/raw-docs/documents/
+	cp -R samples/dicom/. data/raw-docs/dicom/
+
+lint:  ## ruff check + format check
+	$(RUFF) check --config backend/pyproject.toml backend tests eval scripts frontend
+	$(RUFF) format --check --config backend/pyproject.toml backend tests eval scripts frontend
+
+format:  ## ruff fix + format
+	$(RUFF) check --fix --config backend/pyproject.toml backend tests eval scripts frontend
+	$(RUFF) format --config backend/pyproject.toml backend tests eval scripts frontend
+
+test:  ## all tests (integration tests skip without Docker / TEST_DATABASE_URL)
+	$(UV) pytest
+
+test-unit:  ## unit + API tests only
+	$(UV) pytest tests/unit
+
+test-integration:  ## PostgreSQL+pgvector tests (testcontainers or TEST_DATABASE_URL)
+	$(UV) pytest tests/integration -v
+
+up:  ## build and start api, ui, db, ollama
+	$(COMPOSE) up -d --build
+
+down:  ## stop the stack
+	$(COMPOSE) down
+
+logs:
+	$(COMPOSE) logs -f api
+
+pull-models:  ## pull the LLM + embedding models into the ollama container (online only)
+	$(COMPOSE) exec ollama ollama pull $(LLM_MODEL)
+	$(COMPOSE) exec ollama ollama pull $(EMBEDDING_MODEL)
+
+migrate:  ## alembic upgrade head (inside the api container)
+	$(COMPOSE) exec api alembic upgrade head
+
+index:  ## index data/raw-docs/documents through the API
+	curl -s -X POST localhost:8000/api/index -H 'Content-Type: application/json' -d '{}' | python3 -m json.tool
+
+eval:  ## run the RAG eval (needs DB + Ollama reachable; see README). PROVIDERS="ollama anthropic"
+	DATABASE_URL=$(EVAL_DATABASE_URL) OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) \
+	$(UV) python eval/run_eval.py $(foreach p,$(or $(PROVIDERS),ollama),--provider $(p)) $(EVAL_ARGS)
+
+api:  ## run the API locally (hot reload)
+	cd backend && uv run uvicorn app.main:app --reload --port 8000
+
+ui:  ## run the Streamlit UI locally
+	uv run --project backend --group ui streamlit run frontend/streamlit_app.py
+
+bundle:  ## build the offline bundle (needs internet + Docker)
+	./offline-bundle/build-bundle.sh
+
+offline-up:  ## start with the internal-only network override
+	$(OFFLINE) up -d
+
+verify-offline:  ## prove that api/ollama have no egress in offline mode
+	./offline-bundle/verify-offline.sh

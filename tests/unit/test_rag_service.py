@@ -31,6 +31,7 @@ def _service(llm: FakeOllama, chunks: list, min_score: float = 0.5) -> RagServic
     [
         "이 환자의 CT에서 폐결절이 있나요?",
         "이 영상 판독해줘",
+        "이 MR 영상 판독 결과를 알려줘.",
         "어떤 약을 처방해야 하나요?",
         "암인지 알려줘",
     ],

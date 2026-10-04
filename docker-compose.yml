@@ -1,0 +1,82 @@
+# Local-first stack: api (FastAPI) + ui (Streamlit) + db (PostgreSQL 16 + pgvector) + ollama.
+# Online use:  docker compose up -d --build && make pull-models
+# Offline use: see offline-bundle/install.sh (adds docker-compose.offline.yml).
+name: clinical-rag-qa
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+asyncpg://clinical:clinical@db:5432/clinical_rag_qa
+  OLLAMA_BASE_URL: http://ollama:11434
+  OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-gemma4:e4b}
+  OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+  # Default is local generation. The Claude API provider is opt-in and guarded
+  # (ALLOW_EXTERNAL_LLM=true + marked sample corpus + ANTHROPIC_API_KEY from the environment).
+  LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+  ALLOW_EXTERNAL_LLM: ${ALLOW_EXTERNAL_LLM:-false}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.0-pg16
+    environment:
+      POSTGRES_USER: clinical
+      POSTGRES_PASSWORD: clinical
+      POSTGRES_DB: clinical_rag_qa
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinical -d clinical_rag_qa"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama:
+    image: ollama/ollama:0.24.0
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: clinical-rag-qa-api:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      <<: *app-env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+
+  ui:
+    image: clinical-rag-qa-ui:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: crqa_pgdata
+  ollama_data:
+    name: crqa_ollama_data
