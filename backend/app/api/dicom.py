@@ -43,7 +43,7 @@ async def analyze(
             )
         )
         await session.commit()
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
     session.add(
         DicomFile(

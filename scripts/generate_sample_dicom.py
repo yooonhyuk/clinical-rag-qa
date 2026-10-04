@@ -6,7 +6,7 @@ Files:
 - sample-ct-anonymized.dcm      CT, all required/recommended tags, residual PHI-like FAKE values
                                 (PatientName "TEST^PATIENT" etc.) so privacy warnings show up.
 - sample-mr-anonymized.dcm      MR, properly de-identified, all tags present.
-- sample-mr-missing-tags.dcm    MR, missing SliceThickness / ImageOrientationPatient / SOPInstanceUID.
+- sample-mr-missing-tags.dcm    MR, missing SliceThickness, ImageOrientationPatient, SOPInstanceUID
 """
 
 from pathlib import Path
@@ -19,7 +19,9 @@ OUT = Path(__file__).resolve().parents[1] / "samples" / "dicom"
 _SOP_CLASS = {"CT": "1.2.840.10008.5.1.4.1.1.2", "MR": "1.2.840.10008.5.1.4.1.1.4"}
 
 
-def build_dataset(modality: str, tags: dict[str, Any], *, omit: tuple[str, ...] = ()) -> FileDataset:
+def build_dataset(
+    modality: str, tags: dict[str, Any], *, omit: tuple[str, ...] = ()
+) -> FileDataset:
     meta = FileMetaDataset()
     meta.MediaStorageSOPClassUID = _SOP_CLASS[modality]
     meta.MediaStorageSOPInstanceUID = generate_uid()
@@ -50,7 +52,7 @@ def build_dataset(modality: str, tags: dict[str, Any], *, omit: tuple[str, ...] 
     for key in omit:
         if key in ds:
             delattr(ds, key)
-    ds.PixelData = b"\0\0" * (ds.Rows * ds.Columns)  # blank image: nothing to "read"
+    ds.PixelData = b"\0\0" * (64 * 64)  # blank image: nothing to "read"
     return ds
 
 
