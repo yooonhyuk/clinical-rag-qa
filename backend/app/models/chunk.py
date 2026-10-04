@@ -24,9 +24,7 @@ class Chunk(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         Index("chunks_file_type_idx", "file_type"),
     )
 
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("documents.id", ondelete="CASCADE")
-    )
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     chunk_index: Mapped[int] = mapped_column(Integer)
     file_type: Mapped[str] = mapped_column(Text)
     page_number: Mapped[int | None] = mapped_column(Integer)

@@ -1,0 +1,16 @@
+# 필수 태그 규칙 (MVP-1: 규칙 기반. MVP-2에서는 업로드 가이드 문서를 RAG로 검색해 우선 적용)
+version: 1
+common:
+  - StudyInstanceUID
+  - SeriesInstanceUID
+  - SOPInstanceUID
+  - Modality
+  - Rows
+  - Columns
+by_modality:
+  CT: &cross_sectional
+    - PixelSpacing
+    - SliceThickness
+    - ImagePositionPatient
+    - ImageOrientationPatient
+  MR: *cross_sectional
