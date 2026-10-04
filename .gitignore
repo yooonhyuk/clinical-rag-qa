@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.env
+*.egg-info/
+dist/
+build/
+data/raw-docs/documents/*
+data/raw-docs/dicom/*
+data/logs/*
+!data/**/.gitkeep
+offline-bundle/out/
+eval/reports/*.md
+!eval/reports/.gitkeep
+.DS_Store
