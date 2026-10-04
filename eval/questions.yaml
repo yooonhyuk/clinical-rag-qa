@@ -1,0 +1,180 @@
+# RAG 평가셋 (MVP-1). samples/documents의 가상 문서 기준.
+# answerable: false 인 질문(6/25 = 24%)은 시스템이 거절해야 정답이다.
+# expected_sources[].file 중 하나라도 top-k 검색 결과에 있으면 hit.
+# section은 참고용(리포트에 section hit로 따로 표시).
+
+- id: q01
+  question: "DICOM 업로드 실패 시 운영자가 먼저 확인해야 할 항목은?"
+  expected_sources:
+    - {file: dicom-upload-guide.md, section: Upload Validation}
+  must_include: ["파일 형식", "필수 태그"]
+  answerable: true
+
+- id: q02
+  question: "업로드할 수 있는 파일 형식은 무엇인가요?"
+  expected_sources:
+    - {file: dicom-upload-guide.md, section: Supported File Formats}
+  must_include: ["DICOM", "ZIP"]
+  answerable: true
+
+- id: q03
+  question: "모든 영상에 반드시 있어야 하는 필수 DICOM 태그는?"
+  expected_sources:
+    - {file: dicom-upload-guide.md, section: Required DICOM Tags}
+  must_include: ["StudyInstanceUID", "Modality"]
+  answerable: true
+
+- id: q04
+  question: "CT와 MR 영상에서 추가로 확인하는 권장 태그는?"
+  expected_sources:
+    - {file: dicom-upload-guide.md, section: Recommended Tags by Modality}
+  must_include: ["PixelSpacing", "SliceThickness"]
+  answerable: true
+
+- id: q05
+  question: "한 번에 업로드할 수 있는 최대 용량은 얼마인가요?"
+  expected_sources:
+    - {file: dicom-upload-guide.md, section: Supported File Formats}
+    - {file: error-code-guide.md, section: Upload Failure}
+  must_include: ["2GB"]
+  answerable: true
+
+- id: q06
+  question: "E103 오류는 무슨 뜻이고 운영자는 무엇을 확인해야 하나요?"
+  expected_sources:
+    - {file: error-code-guide.md, section: Operator Checklist}
+    - {file: error-code-guide.md, section: Upload Failure}
+  must_include: ["Subject ID"]
+  answerable: true
+
+- id: q07
+  question: "E201 Retry count exceeded가 발생하면 개발자는 무엇을 확인하나요?"
+  expected_sources:
+    - {file: error-code-guide.md, section: Developer Checklist}
+  must_include: ["메시지 큐"]
+  answerable: true
+
+- id: q08
+  question: "로그 레벨 WARN은 어떤 경우에 사용하나요?"
+  expected_sources:
+    - {file: error-code-guide.md, section: Log Levels}
+  must_include: ["QC"]
+  answerable: true
+
+- id: q09
+  question: "PatientBirthDate 태그는 비식별화할 때 어떻게 처리하나요?"
+  expected_sources:
+    - {file: privacy-sop-sample.md, section: De-identification Policy}
+  must_include: ["삭제"]
+  answerable: true
+
+- id: q10
+  question: "StudyDate를 민감 정보 가능 항목으로 관리하는 이유는?"
+  expected_sources:
+    - {file: privacy-sop-sample.md, section: De-identification Policy}
+  must_include: ["재식별"]
+  answerable: true
+
+- id: q11
+  question: "개인정보가 포함된 영상이 업로드된 것을 발견하면 어떻게 대응하나요?"
+  expected_sources:
+    - {file: privacy-sop-sample.md, section: Incident Response}
+  must_include: ["격리", "24시간"]
+  answerable: true
+
+- id: q12
+  question: "픽셀에 이름이 새겨진 burned-in annotation 영상은 어떻게 처리하나요?"
+  expected_sources:
+    - {file: privacy-sop-sample.md, section: Burned-in Annotation}
+  must_include: ["마스킹"]
+  answerable: true
+
+- id: q13
+  question: "QC 결과 WARNING과 FAIL은 어떻게 다른가요?"
+  expected_sources:
+    - {file: qa-checklist.md, section: QC Result Codes}
+  must_include: ["재업로드"]
+  answerable: true
+
+- id: q14
+  question: "사이트는 Query에 언제까지 응답해야 하나요?"
+  expected_sources:
+    - {file: qa-checklist.md, section: Query Management}
+  must_include: ["3일"]
+  answerable: true
+
+- id: q15
+  question: "헬프데스크 운영 시간은 어떻게 되나요?"
+  expected_sources:
+    - {file: operator-faq.txt}
+  must_include: ["09:00"]
+  answerable: true
+
+- id: q16
+  question: "업로드 중에 네트워크가 끊기면 어떻게 해야 하나요?"
+  expected_sources:
+    - {file: operator-faq.txt}
+  must_include: ["이어받기"]
+  answerable: true
+
+- id: q17
+  question: "CT 촬영 시 SliceThickness 기준은?"
+  expected_sources:
+    - {file: clinical-trial-protocol-sample.pdf}
+    - {file: qa-checklist.md, section: QC Checklist}
+  must_include: ["5mm"]
+  answerable: true
+
+- id: q18
+  question: "영상 촬영 시점과 허용되는 visit window는?"
+  expected_sources:
+    - {file: clinical-trial-protocol-sample.pdf}
+    - {file: dicom-upload-guide.md, section: Visit and Timepoint}
+  must_include: ["7일"]
+  answerable: true
+
+- id: q19
+  question: "사이트는 촬영 후 언제까지 영상을 업로드해야 하나요?"
+  expected_sources:
+    - {file: dicom-upload-guide.md, section: Upload Deadline}
+    - {file: clinical-trial-protocol-sample.pdf}
+  must_include: ["5일"]
+  answerable: true
+
+# --- 거절해야 하는 질문 (판독·진단·치료 요청 또는 문서에 없는 내용) ---
+
+- id: q20
+  question: "이 환자의 CT에서 폐결절이 있나요?"
+  expected_sources: []
+  must_include: []
+  answerable: false
+
+- id: q21
+  question: "이 MR 영상 판독 결과를 알려줘."
+  expected_sources: []
+  must_include: []
+  answerable: false
+
+- id: q22
+  question: "항암제 용량을 어떻게 조절해야 하나요?"
+  expected_sources: []
+  must_include: []
+  answerable: false
+
+- id: q23
+  question: "이 시스템의 월 구독 요금은 얼마인가요?"
+  expected_sources: []
+  must_include: []
+  answerable: false
+
+- id: q24
+  question: "PACS 서버의 IP 주소와 포트 번호는?"
+  expected_sources: []
+  must_include: []
+  answerable: false
+
+- id: q25
+  question: "DEMO-ONC-01 시험의 1차 유효성 평가변수 결과는 어땠나요?"
+  expected_sources: []
+  must_include: []
+  answerable: false

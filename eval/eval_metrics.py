@@ -1,0 +1,134 @@
+"""Pure metric functions for the RAG eval (unit-tested; no IO)."""
+
+from dataclasses import dataclass, field
+from statistics import quantiles
+from typing import Any
+
+
+@dataclass(frozen=True, slots=True)
+class EvalQuestion:
+    id: str
+    question: str
+    expected_files: frozenset[str]
+    expected_sections: frozenset[str]
+    must_include: tuple[str, ...]
+    answerable: bool
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "EvalQuestion":
+        sources = raw.get("expected_sources") or []
+        return cls(
+            id=raw["id"],
+            question=raw["question"],
+            expected_files=frozenset(s["file"] for s in sources),
+            expected_sections=frozenset(s["section"] for s in sources if s.get("section")),
+            must_include=tuple(raw.get("must_include") or ()),
+            answerable=bool(raw.get("answerable", True)),
+        )
+
+
+@dataclass(slots=True)
+class EvalOutcome:
+    question: EvalQuestion
+    retrieved_files: list[str]
+    retrieved_sections: list[str | None]
+    cited_files: list[str]
+    answer: str
+    refused: bool
+    refusal_reason: str | None
+    retrieval_ms: int
+    generation_ms: int
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    error: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def hit(self) -> bool:
+        return bool(self.question.expected_files & set(self.retrieved_files))
+
+    @property
+    def section_hit(self) -> bool:
+        if not self.question.expected_sections:
+            return self.hit
+        return bool(self.question.expected_sections & {s for s in self.retrieved_sections if s})
+
+    @property
+    def citation_correct(self) -> bool:
+        cited = set(self.cited_files)
+        return bool(cited) and cited <= self.question.expected_files
+
+    @property
+    def keyword_coverage(self) -> float:
+        terms = self.question.must_include
+        if not terms:
+            return 1.0
+        answer = self.answer.lower()
+        return sum(t.lower() in answer for t in terms) / len(terms)
+
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return numerator / denominator if denominator else None
+
+
+def percentile(values: list[int], pct: int) -> float | None:
+    if not values:
+        return None
+    if len(values) == 1:
+        return float(values[0])
+    return quantiles(values, n=100, method="inclusive")[pct - 1]
+
+
+def summarize(outcomes: list[EvalOutcome]) -> dict[str, Any]:
+    ok = [o for o in outcomes if o.error is None]
+    answerable = [o for o in ok if o.question.answerable]
+    unanswerable = [o for o in ok if not o.question.answerable]
+    answered = [o for o in answerable if not o.refused]
+    generated = [o for o in ok if o.generation_ms > 0]
+    totals = [o.retrieval_ms + o.generation_ms for o in ok]
+    tokens_in = [o.input_tokens for o in ok if o.input_tokens is not None]
+    tokens_out = [o.output_tokens for o in ok if o.output_tokens is not None]
+    return {
+        "questions": len(outcomes),
+        "errors": len(outcomes) - len(ok),
+        "hit_at_k": _ratio(sum(o.hit for o in answerable), len(answerable)),
+        "section_hit_at_k": _ratio(sum(o.section_hit for o in answerable), len(answerable)),
+        "citation_correctness": _ratio(sum(o.citation_correct for o in answered), len(answered)),
+        "keyword_coverage": (
+            sum(o.keyword_coverage for o in answered) / len(answered) if answered else None
+        ),
+        "refusal_correctness": _ratio(sum(o.refused for o in unanswerable), len(unanswerable)),
+        "false_refusal_rate": _ratio(sum(o.refused for o in answerable), len(answerable)),
+        "retrieval_ms_p50": percentile([o.retrieval_ms for o in ok], 50),
+        "retrieval_ms_p95": percentile([o.retrieval_ms for o in ok], 95),
+        "generation_ms_p50": percentile([o.generation_ms for o in generated], 50),
+        "generation_ms_p95": percentile([o.generation_ms for o in generated], 95),
+        "total_ms_p50": percentile(totals, 50),
+        "total_ms_p95": percentile(totals, 95),
+        "input_tokens_total": sum(tokens_in) if tokens_in else None,
+        "output_tokens_total": sum(tokens_out) if tokens_out else None,
+    }
+
+
+def failed_questions(outcomes: list[EvalOutcome]) -> list[tuple[str, str]]:
+    """(id, reason) for every question that missed at least one applicable metric."""
+    failures: list[tuple[str, str]] = []
+    for o in outcomes:
+        q = o.question
+        if o.error:
+            failures.append((q.id, f"error: {o.error}"))
+        elif not q.answerable and not o.refused:
+            failures.append((q.id, "should refuse but answered"))
+        elif q.answerable and o.refused:
+            failures.append((q.id, f"false refusal ({o.refusal_reason})"))
+        elif q.answerable:
+            reasons = []
+            if not o.hit:
+                reasons.append(f"retrieval miss (got {sorted(set(o.retrieved_files))})")
+            if not o.citation_correct:
+                reasons.append(f"citation {sorted(set(o.cited_files))}")
+            if o.keyword_coverage < 1:
+                reasons.append(f"keywords {o.keyword_coverage:.0%}")
+            if reasons:
+                failures.append((q.id, "; ".join(reasons)))
+    return failures
