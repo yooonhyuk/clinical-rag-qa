@@ -61,6 +61,10 @@ async def run_question(container: AppContainer, q: EvalQuestion, top_k: int) -> 
     try:
         async with container.session_factory() as session:
             r = await container.rag.ask(session, q.question, top_k=top_k)
+        retrieved = r.retrieved
+        if not retrieved:  # OUT_OF_SCOPE skips retrieval; measure the cosine anyway
+            async with container.session_factory() as session:
+                retrieved, _ = await container.rag.retrieve(session, q.question, top_k=top_k)
     except Exception as exc:  # recorded per question, the run continues
         return EvalOutcome(q, [], [], [], "", False, None, 0, 0, error=repr(exc))
     return EvalOutcome(
@@ -75,7 +79,11 @@ async def run_question(container: AppContainer, q: EvalQuestion, top_k: int) -> 
         generation_ms=r.generation_ms,
         input_tokens=r.usage.input_tokens if r.usage else None,
         output_tokens=r.usage.output_tokens if r.usage else None,
-        extra={"citationMode": r.citation_mode},
+        extra={
+            "citationMode": r.citation_mode,
+            # what the NO_EVIDENCE threshold compares against: best cosine among retrieved
+            "maxCosine": max((c.score for c in retrieved), default=None),
+        },
     )
 
 
@@ -94,6 +102,7 @@ async def run_provider(
             "provider": provider,
             "model": model,
             "embedding_model": settings.ollama_embedding_model,
+            "embedding_dim": settings.embedding_dimension,
             "top_k": top_k,
             "chunk_size": settings.chunk_size,
             "chunk_overlap": settings.chunk_overlap,
@@ -103,6 +112,22 @@ async def run_provider(
         return outcomes, config
     finally:
         await container.aclose()
+
+
+def _question_row(o: EvalOutcome) -> dict[str, Any]:
+    """Per-question record (used to inspect cosine distributions / refusal thresholds)."""
+    return {
+        "id": o.question.id,
+        "answerable": o.question.answerable,
+        "refused": o.refused,
+        "refusalReason": o.refusal_reason,
+        "hit": o.hit if o.question.answerable else None,
+        "sectionHit": o.section_hit if o.question.answerable else None,
+        "maxCosine": o.extra.get("maxCosine"),
+        "retrievedFiles": o.retrieved_files,
+        "citedFiles": o.cited_files,
+        "error": o.error,
+    }
 
 
 def _fmt(key: str, value: Any) -> str:
@@ -160,7 +185,7 @@ def render_comparison(results: dict[str, dict[str, Any] | str], run_at: str) -> 
         "|---|" + "---|" * len(providers),
     ]
     for key, label in METRIC_LABELS.items():
-        cells = [_fmt(r[key]) if isinstance(r, dict) else "skipped" for r in results.values()]
+        cells = [_fmt(key, r[key]) if isinstance(r, dict) else "skipped" for r in results.values()]
         lines.append(f"| {label} | " + " | ".join(cells) + " |")
     notes = [f"- {p}: {r}" for p, r in results.items() if isinstance(r, str)]
     return "\n".join(lines + ([""] + notes if notes else [])) + "\n"
@@ -203,6 +228,14 @@ async def main() -> int:
         path.write_text(report, encoding="utf-8")
         (REPORTS / f"{run_at}-{provider}.json").write_text(
             json.dumps(summarize(outcomes), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        (REPORTS / f"{run_at}-{provider}-questions.json").write_text(
+            json.dumps(
+                {"config": config, "questions": [_question_row(o) for o in outcomes]},
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
         )
         results[provider] = summarize(outcomes)
         print(report)
