@@ -43,7 +43,7 @@ def _client(settings: Settings, factory: FakeSessionFactory, llm: FakeOllama | N
     container = build_container(settings, ollama=llm or FakeOllama(), session_factory=factory)  # type: ignore[arg-type]
     chunks = [make_chunk("dicom-upload-guide.md", 0.9, page_number=None, chunk_index=3)]
 
-    async def search(session, vector, *, top_k, file_type):
+    async def search(session, vector, *, top_k, file_type, **_):
         return chunks
 
     container.rag._search = search

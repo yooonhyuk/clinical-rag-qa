@@ -103,12 +103,16 @@ class RagService:
         *,
         system_prompt: str,
         min_score: float,
+        hybrid: bool = True,
+        rrf_k: int = 60,
         search: SearchFn = search_chunks,
     ) -> None:
         self._embeddings = embeddings
         self._llm = llm
         self._system_prompt = system_prompt
         self._min_score = min_score
+        self._hybrid = hybrid
+        self._rrf_k = rrf_k
         self._search = search
 
     @property
@@ -125,7 +129,14 @@ class RagService:
     ) -> tuple[list[RetrievedChunk], int]:
         start = time.perf_counter()
         query_vector = await self._embeddings.embed_query(question)
-        chunks = await self._search(session, query_vector, top_k=top_k, file_type=file_type)
+        chunks = await self._search(
+            session,
+            query_vector,
+            top_k=top_k,
+            file_type=file_type,
+            query_text=question if self._hybrid else None,
+            rrf_k=self._rrf_k,
+        )
         return chunks, _elapsed_ms(start)
 
     async def ask(

@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from app.models import AskLog
@@ -15,11 +17,12 @@ from app.services.rag_service import (
     extract_citations,
     is_out_of_scope,
 )
+from app.services.vector_search_service import rrf_fuse
 from tests.fakes import FakeOllama, FakeSession, make_chunk
 
 
 def _service(llm: FakeOllama, chunks: list, min_score: float = 0.5) -> RagService:
-    async def search(session, vector, *, top_k, file_type):
+    async def search(session, vector, *, top_k, file_type, **_):
         return chunks[:top_k]
 
     embeddings = EmbeddingService(llm, dimension=768)
@@ -135,3 +138,30 @@ async def test_provider_refusal_is_a_refusal() -> None:
     result = await _service(Declines(), [make_chunk()]).ask(FakeSession(), "q", top_k=5)
     assert result.refused and result.refusal_reason == RefusalReason.MODEL_REFUSED
     assert result.usage is not None and result.usage.provider == "anthropic"
+
+
+def test_rrf_fuse_rewards_items_ranked_by_both_channels() -> None:
+    a, b, c, d = (uuid.uuid4() for _ in range(4))
+    fused = rrf_fuse([[a, b, c], [c, d, a]], k=60)
+    assert fused[:2] == [a, c]  # in both rankings
+    assert set(fused) == {a, b, c, d}
+
+
+async def test_hybrid_flag_controls_query_text_passed_to_search() -> None:
+    seen: list[str | None] = []
+
+    async def search(session, vector, *, top_k, file_type, query_text=None, rrf_k=60):
+        seen.append(query_text)
+        return []
+
+    for hybrid in (True, False):
+        rag = RagService(
+            EmbeddingService(FakeOllama(), dimension=768),
+            FakeOllama(),
+            system_prompt="sys",
+            min_score=0.5,
+            hybrid=hybrid,
+            search=search,
+        )
+        await rag.retrieve(FakeSession(), "업로드 용량", top_k=3)
+    assert seen == ["업로드 용량", None]

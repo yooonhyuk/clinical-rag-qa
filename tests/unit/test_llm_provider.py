@@ -99,7 +99,7 @@ def test_app_refuses_to_start_when_guardrail_fails(settings: Settings, monkeypat
 async def _ask(generator) -> object:
     chunks = [make_chunk("dicom-upload-guide.md", 0.9), make_chunk("error-code-guide.md", 0.8)]
 
-    async def search(session, vector, *, top_k, file_type):
+    async def search(session, vector, *, top_k, file_type, **_):
         return chunks
 
     rag = RagService(

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1000, ge=100)
     chunk_overlap: int = Field(default=150, ge=0)
     min_relevance_score: float = Field(default=0.45, ge=-1.0, le=1.0)
+    # Fuse pgvector ranking with a pg_trgm lexical ranking (RRF). See vector_search_service.
+    hybrid_search: bool = True
+    rrf_k: int = Field(default=60, ge=1)
 
     raw_docs_path: Path = Path("./data/raw-docs/documents")
     dicom_path: Path = Path("./data/raw-docs/dicom")
