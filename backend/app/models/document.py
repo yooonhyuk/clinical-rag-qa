@@ -29,6 +29,8 @@ class Document(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     error_type: Mapped[str | None] = mapped_column(Text)
     error_message: Mapped[str | None] = mapped_column(Text)
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Embedding model of the current chunks; a different configured model triggers re-embedding.
+    embedding_model: Mapped[str | None] = mapped_column(Text)
 
     chunks: Mapped[list["Chunk"]] = relationship(  # noqa: F821
         back_populates="document", cascade="all, delete-orphan", passive_deletes=True

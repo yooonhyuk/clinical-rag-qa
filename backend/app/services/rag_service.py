@@ -136,6 +136,7 @@ class RagService:
             file_type=file_type,
             query_text=question if self._hybrid else None,
             rrf_k=self._rrf_k,
+            embedding_model=self._embeddings.model,
         )
         return chunks, _elapsed_ms(start)
 

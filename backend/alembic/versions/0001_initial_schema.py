@@ -17,7 +17,8 @@ down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# nomic-embed-text = 768. Changing the embedding model => new migration altering this column.
+# nomic-embed-text = 768 (the original default). Since 0004 the dimension follows the configured
+# embedding model (bge-m3 = 1024); see app.services.embedding_schema.
 EMBEDDING_DIM = 768
 
 

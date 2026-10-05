@@ -4,13 +4,13 @@ RUFF    := $(UV) ruff
 COMPOSE := docker compose
 OFFLINE := docker compose -f docker-compose.yml -f docker-compose.offline.yml
 LLM_MODEL       ?= gemma4:e4b
-EMBEDDING_MODEL ?= nomic-embed-text
+EMBEDDING_MODEL ?= bge-m3
 # `make eval` runs on the host against the compose stack's published ports.
 EVAL_DATABASE_URL ?= postgresql+asyncpg://clinical:clinical@localhost:5432/clinical_rag_qa
 EVAL_OLLAMA_URL   ?= http://localhost:11434
 
 .PHONY: help setup samples seed lint format test test-unit test-integration \
-        up down logs pull-models migrate index eval api ui bundle offline-up verify-offline
+        up down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline
 
 help:  ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-18s %s\n",$$1,$$2}'
@@ -59,6 +59,9 @@ pull-models:  ## pull the LLM + embedding models into the ollama container (onli
 
 migrate:  ## alembic upgrade head (inside the api container)
 	$(COMPOSE) exec api alembic upgrade head
+
+reset-embeddings:  ## resize chunks.embedding for OLLAMA_EMBEDDING_MODEL and clear all vectors (then reindex)
+	DATABASE_URL=$(EVAL_DATABASE_URL) $(UV) python scripts/reset_embeddings.py $(RESET_ARGS)
 
 index:  ## index data/raw-docs/documents through the API
 	curl -s -X POST localhost:8000/api/index -H 'Content-Type: application/json' -d '{}' | python3 -m json.tool

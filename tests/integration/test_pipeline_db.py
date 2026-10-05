@@ -14,7 +14,7 @@ from app.models import AskLog, Chunk, Document, DocumentStatus
 from app.services.embedding_service import EmbeddingService
 from app.services.indexing_pipeline import IndexingPipeline
 from app.services.vector_search_service import search_chunks
-from tests.fakes import FakeOllama
+from tests.fakes import DIM, FakeOllama
 
 pytestmark = pytest.mark.integration
 
@@ -30,7 +30,7 @@ def corpus(tmp_path: Path, sample_docs_dir: Path) -> Path:
 
 
 def _pipeline(factory, llm: FakeOllama) -> IndexingPipeline:
-    embeddings = EmbeddingService(llm, dimension=768, concurrency=2, batch_size=4)
+    embeddings = EmbeddingService(llm, dimension=DIM, concurrency=2, batch_size=4)
     return IndexingPipeline(
         factory, embeddings, parse_concurrency=2, chunk_size=500, chunk_overlap=80
     )
@@ -128,7 +128,7 @@ async def test_hybrid_search_ranks_korean_text_when_embeddings_degenerate(
     vector and check that the pg_trgm channel still brings the right chunk to the top."""
     await _pipeline(session_factory, FakeOllama()).run(sample_docs_dir)
     question = "한 번에 업로드할 수 있는 최대 용량은 얼마인가요?"
-    constant = [1.0] + [0.0] * 767
+    constant = [1.0] + [0.0] * (DIM - 1)
     async with session_factory() as s:
         hybrid = await search_chunks(s, constant, top_k=3, query_text=question)
         vector_only = await search_chunks(s, constant, top_k=3)

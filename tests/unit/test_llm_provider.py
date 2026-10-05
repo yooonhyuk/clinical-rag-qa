@@ -17,7 +17,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_guardrail import ExternalLLMNotAllowedError, validate_provider
 from app.services.ollama_client import OllamaClient
 from app.services.rag_service import RagService
-from tests.fakes import FakeOllama, FakeSession, FakeSessionFactory, make_chunk
+from tests.fakes import DIM, FakeOllama, FakeSession, FakeSessionFactory, make_chunk
 from tests.unit.test_anthropic_client import fake_response, make_client
 
 
@@ -103,7 +103,7 @@ async def _ask(generator) -> object:
         return chunks
 
     rag = RagService(
-        EmbeddingService(FakeOllama(), dimension=768),
+        EmbeddingService(FakeOllama(), dimension=DIM),
         generator,
         system_prompt="sys",
         min_score=0.5,

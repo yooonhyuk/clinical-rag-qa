@@ -77,7 +77,9 @@ class IndexingPipeline:
         files = await asyncio.to_thread(scan_documents, root)
 
         async with self._session_factory() as session:
-            job = IndexJob(status="RUNNING", total=len(files))
+            job = IndexJob(
+                status="RUNNING", total=len(files), embedding_model=self._embeddings.model
+            )
             session.add(job)
             await session.commit()
 
@@ -141,9 +143,17 @@ class IndexingPipeline:
     async def _register(
         self, session: AsyncSession, f: DiscoveredFile
     ) -> tuple[Document | None, str | None]:
-        """Create (or reuse a previously FAILED) document row. Returns (None, name) on duplicate."""
+        """Create (or reuse a FAILED / other-model) document row. (None, name) on duplicate.
+
+        A document indexed with a different embedding model is re-embedded: its old vectors
+        are not comparable with the configured model's query vectors.
+        """
         existing = await session.scalar(select(Document).where(Document.checksum == f.checksum))
-        if existing is not None and existing.status != DocumentStatus.FAILED:
+        if (
+            existing is not None
+            and existing.status != DocumentStatus.FAILED
+            and existing.embedding_model == self._embeddings.model
+        ):
             return None, existing.file_name
 
         doc = existing or Document(checksum=f.checksum)
@@ -192,11 +202,13 @@ class IndexingPipeline:
                 section_title=c.section_title,
                 text=c.text,
                 embedding=vector,
+                embedding_model=self._embeddings.model,
             )
             for c, vector in zip(chunks, vectors, strict=True)
         )
         doc.status = DocumentStatus.INDEXED
         doc.chunk_count = len(chunks)
+        doc.embedding_model = self._embeddings.model
         doc.indexed_at = utcnow()
         await session.commit()
         return len(chunks)

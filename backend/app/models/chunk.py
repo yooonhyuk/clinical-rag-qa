@@ -7,8 +7,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.config import get_settings
 from app.models.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
 
-# The column dimension must match the embedding model. Changing it requires a migration.
-EMBEDDING_DIM = get_settings().embedding_dim
+# The column dimension must match the embedding model. Changing it requires
+# `make reset-embeddings` (alters the column, clears all vectors) followed by a reindex.
+EMBEDDING_DIM = get_settings().embedding_dimension
 
 
 class Chunk(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
@@ -31,5 +32,8 @@ class Chunk(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     section_title: Mapped[str | None] = mapped_column(Text)
     text: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    # Ollama model that produced `embedding`. Vectors of different models are not comparable,
+    # so search only reads chunks of the configured model and /api/health flags any others.
+    embedding_model: Mapped[str] = mapped_column(Text)
 
     document: Mapped["Document"] = relationship(back_populates="chunks")  # noqa: F821

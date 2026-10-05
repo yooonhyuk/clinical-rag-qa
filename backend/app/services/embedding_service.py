@@ -28,6 +28,7 @@ class EmbeddingService:
         client: EmbeddingClient,
         *,
         dimension: int,
+        model: str = "unknown",
         concurrency: int = 4,
         batch_size: int = 16,
         query_prefix: str = "",
@@ -35,10 +36,15 @@ class EmbeddingService:
     ) -> None:
         self._client = client
         self._dimension = dimension
+        self.model = model  # recorded on every chunk; vectors of different models never mix
         self._semaphore = asyncio.Semaphore(concurrency)
         self._batch_size = batch_size
         self._query_prefix = query_prefix
         self._document_prefix = document_prefix
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
 
     async def embed_query(self, text: str) -> list[float]:
         return await self._embed_one(self._query_prefix + text)

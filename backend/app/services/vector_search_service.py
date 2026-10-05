@@ -1,10 +1,14 @@
 """Chunk search: pgvector cosine search, optionally fused with a pg_trgm lexical channel.
 
-Hybrid mode exists because the default embedding model (nomic-embed-text) has an English
-WordPiece vocabulary: every Hangul word becomes `[UNK]`, so Korean questions embed to almost
-the same vector and cosine ranking alone degenerates. `word_similarity` (pg_trgm) works on
-Hangul character trigrams, and the two rankings are merged with Reciprocal Rank Fusion.
+Hybrid mode was added as a mitigation for nomic-embed-text, whose English WordPiece vocabulary
+maps every Hangul word to `[UNK]`, so Korean questions embed to almost the same vector and
+cosine ranking alone degenerates (docs/issues/001). The default model is now the multilingual
+bge-m3 and hybrid is opt-in (HYBRID_SEARCH=true). `word_similarity` (pg_trgm) works on Hangul
+character trigrams, and the two rankings are merged with Reciprocal Rank Fusion.
 `score` always stays the cosine similarity (it drives the NO_EVIDENCE threshold).
+
+With `embedding_model` set, only chunks embedded by that model are searched: vectors of
+different models are not comparable (see embedding_schema).
 """
 
 import uuid
@@ -62,6 +66,7 @@ async def search_chunks(
     file_type: str | None = None,
     query_text: str | None = None,
     rrf_k: int = 60,
+    embedding_model: str | None = None,
 ) -> list[RetrievedChunk]:
     """Vector-only search, or hybrid (vector + pg_trgm, RRF) when `query_text` is given."""
     distance = Chunk.embedding.cosine_distance(query_embedding)
@@ -77,6 +82,8 @@ async def search_chunks(
     )
     if file_type is not None:
         stmt = stmt.where(Chunk.file_type == file_type)
+    if embedding_model is not None:
+        stmt = stmt.where(Chunk.embedding_model == embedding_model)
 
     if lexical is None:
         rows = (await session.execute(stmt.order_by(distance).limit(top_k))).all()

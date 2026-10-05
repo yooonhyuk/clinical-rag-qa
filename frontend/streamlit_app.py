@@ -41,7 +41,15 @@ with st.sidebar:
     health = st.session_state.setdefault("health", api("GET", "/api/health"))
     if health:
         st.write(f"상태: **{health['status']}** · LLM provider: `{health['llmProvider']}`")
-        for key in ("database", "pgvector", "ollama", "llmModel", "embeddingModel"):
+        components = (
+            "database",
+            "pgvector",
+            "ollama",
+            "llmModel",
+            "embeddingModel",
+            "embeddingIndex",
+        )
+        for key in components:
             item = health[key]
             st.write(f"{'✅' if item['ok'] else '⚠️'} {key}: {item.get('detail') or ''}")
         if health["llmProvider"] != "ollama":

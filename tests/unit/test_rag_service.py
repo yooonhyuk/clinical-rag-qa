@@ -18,14 +18,14 @@ from app.services.rag_service import (
     is_out_of_scope,
 )
 from app.services.vector_search_service import rrf_fuse
-from tests.fakes import FakeOllama, FakeSession, make_chunk
+from tests.fakes import DIM, FakeOllama, FakeSession, make_chunk
 
 
 def _service(llm: FakeOllama, chunks: list, min_score: float = 0.5) -> RagService:
     async def search(session, vector, *, top_k, file_type, **_):
         return chunks[:top_k]
 
-    embeddings = EmbeddingService(llm, dimension=768)
+    embeddings = EmbeddingService(llm, dimension=DIM)
     return RagService(embeddings, llm, system_prompt="sys", min_score=min_score, search=search)
 
 
@@ -150,13 +150,13 @@ def test_rrf_fuse_rewards_items_ranked_by_both_channels() -> None:
 async def test_hybrid_flag_controls_query_text_passed_to_search() -> None:
     seen: list[str | None] = []
 
-    async def search(session, vector, *, top_k, file_type, query_text=None, rrf_k=60):
+    async def search(session, vector, *, top_k, file_type, query_text=None, rrf_k=60, **_):
         seen.append(query_text)
         return []
 
     for hybrid in (True, False):
         rag = RagService(
-            EmbeddingService(FakeOllama(), dimension=768),
+            EmbeddingService(FakeOllama(), dimension=DIM),
             FakeOllama(),
             system_prompt="sys",
             min_score=0.5,

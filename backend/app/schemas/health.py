@@ -14,3 +14,5 @@ class HealthResponse(CamelModel):
     ollama: ComponentStatus
     llm_model: ComponentStatus
     embedding_model: ComponentStatus
+    # chunks.embedding dimension + models present in chunks vs the configured embedding model
+    embedding_index: ComponentStatus

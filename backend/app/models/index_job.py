@@ -19,5 +19,6 @@ class IndexJob(UUIDPrimaryKeyMixin, Base):
     # Per-file outcome (incl. SKIPPED_DUPLICATE and failure reasons). Added on top of the plan's
     # schema because a duplicate cannot get its own `documents` row (checksum is UNIQUE).
     details: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    embedding_model: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

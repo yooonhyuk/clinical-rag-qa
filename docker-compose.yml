@@ -7,8 +7,11 @@ x-app-env: &app-env
   DATABASE_URL: postgresql+asyncpg://clinical:clinical@db:5432/clinical_rag_qa
   OLLAMA_BASE_URL: http://ollama:11434
   OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-gemma4:e4b}
-  OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
-  EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+  # Multilingual default (see docs/issues/001-korean-embedding-unk.md). Changing the model to one
+  # with another dimension needs `make reset-embeddings` + reindex. Empty EMBEDDING_DIM = the
+  # known dimension of the model (bge-m3 1024, nomic-embed-text 768).
+  OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-}
   # Default is local generation. The Claude API provider is opt-in and guarded
   # (ALLOW_EXTERNAL_LLM=true + marked sample corpus + ANTHROPIC_API_KEY from the environment).
   LLM_PROVIDER: ${LLM_PROVIDER:-ollama}

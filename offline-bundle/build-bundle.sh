@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${APP_VERSION:-0.1.0}"
 LLM_MODEL="${LLM_MODEL:-gemma4:e4b}"
-EMBEDDING_MODEL="${EMBEDDING_MODEL:-nomic-embed-text}"
+EMBEDDING_MODEL="${EMBEDDING_MODEL:-bge-m3}"   # multilingual (Korean); ~1.2GB
 PLATFORM="${PLATFORM:-linux/amd64}"              # target machine architecture
 WHEEL_PLATFORM="${WHEEL_PLATFORM:-manylinux_2_28_x86_64}"
 DB_IMAGE="pgvector/pgvector:0.8.0-pg16"

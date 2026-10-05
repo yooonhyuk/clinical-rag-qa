@@ -9,7 +9,7 @@ from typing import Any
 from app.services.llm_types import GenerationResult, GroundedAnswer, LLMUsage
 from app.services.vector_search_service import RetrievedChunk
 
-DIM = 768
+DIM = 1024  # bge-m3 (default embedding model)
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")
 
 
@@ -72,7 +72,7 @@ class FakeOllama:
         return self.answer, self._usage()
 
     async def list_models(self) -> list[str]:
-        return ["fake-gemma:latest", "nomic-embed-text:latest"]
+        return ["fake-gemma:latest", "bge-m3:latest"]
 
 
 def make_chunk(
@@ -94,9 +94,17 @@ def make_chunk(
 class FakeSession:
     """Minimal AsyncSession stand-in that records added objects."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        embedding_dim: int = DIM,
+        chunk_models: list[str] | None = None,
+        reindex_pending: int = 0,
+    ) -> None:
         self.added: list[Any] = []
         self.commits = 0
+        # what `inspect_embedding_index` reads (column dimension, chunk models, pending docs)
+        self.index_state = (embedding_dim, chunk_models or [], reindex_pending)
 
     async def __aenter__(self) -> "FakeSession":
         return self
@@ -113,7 +121,15 @@ class FakeSession:
     async def rollback(self) -> None:
         return None
 
-    async def execute(self, *args: Any, **kwargs: Any) -> Any:
+    async def execute(self, statement: Any = None, *args: Any, **kwargs: Any) -> Any:
+        if "atttypmod" in str(statement):
+            state = self.index_state
+
+            class _Row:
+                def one(self) -> tuple[Any, ...]:
+                    return state
+
+            return _Row()
         return None
 
     async def scalar(self, *args: Any, **kwargs: Any) -> Any:
@@ -128,11 +144,12 @@ class FakeSession:
 
 
 class FakeSessionFactory:
-    def __init__(self) -> None:
+    def __init__(self, **session_kwargs: Any) -> None:
         self.sessions: list[FakeSession] = []
+        self._session_kwargs = session_kwargs
 
     def __call__(self) -> FakeSession:
-        session = FakeSession()
+        session = FakeSession(**self._session_kwargs)
         self.sessions.append(session)
         return session
 

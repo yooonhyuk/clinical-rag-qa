@@ -82,7 +82,8 @@ def build_container(
 
     embeddings = EmbeddingService(
         ollama,
-        dimension=settings.embedding_dim,
+        dimension=settings.embedding_dimension,
+        model=settings.ollama_embedding_model,
         concurrency=settings.embed_concurrency,
         batch_size=settings.embed_batch_size,
         query_prefix=settings.embedding_query_prefix,

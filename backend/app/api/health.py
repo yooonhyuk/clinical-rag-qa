@@ -3,6 +3,7 @@ from sqlalchemy import text
 
 from app.api.deps import ContainerDep, SessionDep
 from app.schemas.health import ComponentStatus, HealthResponse
+from app.services.embedding_schema import evaluate_embedding_index, inspect_embedding_index
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -26,6 +27,19 @@ async def health(container: ContainerDep, session: SessionDep) -> HealthResponse
         database = ComponentStatus(ok=False, detail=str(exc).splitlines()[0])
         pgvector = ComponentStatus(ok=False, detail="database unavailable")
 
+    if database.ok:
+        try:
+            ok, detail = evaluate_embedding_index(
+                await inspect_embedding_index(session),
+                model=settings.ollama_embedding_model,
+                dim=settings.embedding_dimension,
+            )
+            embedding_index = ComponentStatus(ok=ok, detail=detail)
+        except Exception as exc:
+            embedding_index = ComponentStatus(ok=False, detail=str(exc).splitlines()[0])
+    else:
+        embedding_index = ComponentStatus(ok=False, detail="database unavailable")
+
     try:
         models = await container.ollama.list_models()
         ollama = ComponentStatus(ok=True, detail=f"{len(models)} models")
@@ -47,7 +61,7 @@ async def health(container: ContainerDep, session: SessionDep) -> HealthResponse
         ok=_has_model(models, settings.ollama_embedding_model),
         detail=settings.ollama_embedding_model,
     )
-    parts = (database, pgvector, ollama, llm_model, embedding_model)
+    parts = (database, pgvector, ollama, llm_model, embedding_model, embedding_index)
     return HealthResponse(
         status="ok" if all(p.ok for p in parts) else "degraded",
         llm_provider=settings.llm_provider,
@@ -56,4 +70,5 @@ async def health(container: ContainerDep, session: SessionDep) -> HealthResponse
         ollama=ollama,
         llm_model=llm_model,
         embedding_model=embedding_model,
+        embedding_index=embedding_index,
     )

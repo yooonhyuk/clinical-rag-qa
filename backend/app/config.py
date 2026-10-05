@@ -1,27 +1,53 @@
 """Application settings loaded from environment variables (see `.env.example`)."""
 
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _APP_DIR = Path(__file__).resolve().parent
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingModelSpec:
+    dimension: int
+    query_prefix: str = ""
+    document_prefix: str = ""
+
+
+# Defaults for embedding models we have measured. Any other Ollama embedding model works too,
+# but then EMBEDDING_DIM must be set explicitly (and the prefixes, if the model needs them).
+KNOWN_EMBEDDING_MODELS: dict[str, EmbeddingModelSpec] = {
+    # Multilingual (XLM-RoBERTa, 250k SentencePiece vocab incl. Hangul). No task prefixes.
+    "bge-m3": EmbeddingModelSpec(1024),
+    # English WordPiece vocab (30,522 tokens, no Hangul syllables): every Korean word -> [UNK].
+    # See docs/issues/001-korean-embedding-unk.md. Trained with task prefixes.
+    "nomic-embed-text": EmbeddingModelSpec(768, "search_query: ", "search_document: "),
+}
+
+
+def normalize_model_name(name: str) -> str:
+    """`bge-m3:latest` and `bge-m3` are the same Ollama model."""
+    return name.removesuffix(":latest")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://clinical:clinical@localhost:5432/clinical_rag_qa"
-    embedding_dim: int = 768
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_llm_model: str = "gemma4:e4b"
-    ollama_embedding_model: str = "nomic-embed-text"
-    # nomic-embed-text is trained with task prefixes; set both to "" for models that are not.
-    embedding_query_prefix: str = "search_query: "
-    embedding_document_prefix: str = "search_document: "
+    ollama_embedding_model: str = "bge-m3"
+    # None = take the value from KNOWN_EMBEDDING_MODELS (required for unknown models).
+    # Changing the dimension needs `make reset-embeddings` + reindex (vectors are not portable).
+    embedding_dim: int | None = Field(default=None, ge=1, le=16000)
+    # Task prefixes (nomic-embed-text: "search_query: " / "search_document: ", bge-m3: "").
+    embedding_query_prefix: str | None = None
+    embedding_document_prefix: str | None = None
     ollama_timeout_sec: float = 60.0
     ollama_max_retries: int = Field(default=3, ge=0)
 
@@ -47,7 +73,9 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=150, ge=0)
     min_relevance_score: float = Field(default=0.45, ge=-1.0, le=1.0)
     # Fuse pgvector ranking with a pg_trgm lexical ranking (RRF). See vector_search_service.
-    hybrid_search: bool = True
+    # Off by default since bge-m3: no retrieval gain on the eval set (docs/issues/001); keep it
+    # on for embedding models without Korean vocabulary.
+    hybrid_search: bool = False
     rrf_k: int = Field(default=60, ge=1)
 
     raw_docs_path: Path = Path("./data/raw-docs/documents")
@@ -55,6 +83,39 @@ class Settings(BaseSettings):
     samples_path: Path = Path("./samples")
     rules_path: Path = _APP_DIR / "rules"
     prompts_path: Path = _APP_DIR / "prompts"
+
+    @field_validator("embedding_dim", mode="before")
+    @classmethod
+    def _blank_dim_means_auto(cls, value: object) -> object:
+        # docker compose passes `EMBEDDING_DIM: ${EMBEDDING_DIM:-}` as an empty string
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @model_validator(mode="after")
+    def _resolve_embedding_model(self) -> "Settings":
+        spec = KNOWN_EMBEDDING_MODELS.get(normalize_model_name(self.ollama_embedding_model))
+        if spec is None:
+            if self.embedding_dim is None:
+                raise ValueError(
+                    f"EMBEDDING_DIM is required for unknown embedding model "
+                    f"{self.ollama_embedding_model!r} (known: {sorted(KNOWN_EMBEDDING_MODELS)})"
+                )
+            spec = EmbeddingModelSpec(self.embedding_dim)
+        elif self.embedding_dim is not None and self.embedding_dim != spec.dimension:
+            raise ValueError(
+                f"EMBEDDING_DIM={self.embedding_dim} does not match "
+                f"{self.ollama_embedding_model} ({spec.dimension}-dim)"
+            )
+        self.embedding_dim = spec.dimension
+        if self.embedding_query_prefix is None:
+            self.embedding_query_prefix = spec.query_prefix
+        if self.embedding_document_prefix is None:
+            self.embedding_document_prefix = spec.document_prefix
+        return self
+
+    @property
+    def embedding_dimension(self) -> int:
+        assert self.embedding_dim is not None  # resolved by the validator
+        return self.embedding_dim
 
     @property
     def allowed_roots(self) -> list[Path]:
