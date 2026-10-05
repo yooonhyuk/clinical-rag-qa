@@ -135,6 +135,7 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 - 문서 메타데이터, chunk, embedding, DICOM 태그(JSONB), 인덱싱 로그, 질의 로그를 **DB 하나**에서 관리합니다. 별도 벡터 DB(Chroma 등)를 두지 않습니다.
 - 문서 상태 변경과 chunk 저장을 **한 트랜잭션**으로 묶습니다. 중간에 실패하면 chunk는 롤백되고 문서에는 `FAILED`와 `error_type`만 남습니다. 검색 쿼리는 `WHERE d.status = 'INDEXED'`이므로 반쯤 인덱싱된 문서가 검색에 섞이지 않습니다.
 - 메타데이터 필터(`file_type`)를 벡터 검색과 같은 SQL의 `WHERE` 조건으로 씁니다. 인덱스는 HNSW(`vector_cosine_ops`)입니다.
+- **하이브리드 검색(기본값, `HYBRID_SEARCH=true`)**: pgvector cosine 순위와 pg_trgm `word_similarity(질문, chunk)` 순위를 Reciprocal Rank Fusion(k=60)으로 합칩니다. 첫 평가에서 nomic-embed-text가 **한글 단어를 전부 `[UNK]` 토큰 하나로** 바꾼다는 것을 확인했기 때문입니다(영어 WordPiece 어휘). 예를 들어 "업로드"와 "태그"의 embedding cosine이 1.0이고, 서로 다른 한국어 질문들이 같은 top-5를 받았습니다. 거절 임계값에 쓰는 `score`는 계속 cosine입니다. 확장은 Alembic `0003`에서 만들고, 문서 100개 이하 규모라 trigram 인덱스는 두지 않았습니다.
 - 공식 Docker 이미지 하나로 폐쇄망에 그대로 옮길 수 있습니다. 스키마는 Alembic으로 코드에서 관리합니다.
 - 중복 문서: `checksum`에 UNIQUE를 걸었기 때문에 중복 파일은 `documents`에 행을 만들 수 없습니다. 그래서 `SKIPPED_DUPLICATE` 결과는 `index_jobs.details`(JSONB, 기획서 스키마에 추가한 컬럼)에 파일별로 기록합니다. 이전에 `FAILED`였던 문서는 다시 인덱싱할 때 같은 행을 재사용해 재시도합니다.
 
@@ -160,7 +161,7 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 
 인용은 다음 순서로 정합니다. 모델이 돌려준 `cited_context_ids`를 먼저 쓰고, 없으면 본문의 `[n]` 표기를 파싱하고, 그것도 없으면 프롬프트에 넣은 evidence 전체를 출처로 씁니다(`citationMode`로 구분). 모든 요청은 `ask_logs`에 질문, 검색된 chunk id, 출처, 검색·생성 지연 시간, 거절 사유, provider/model, 토큰 수와 함께 저장합니다.
 
-`MIN_RELEVANCE_SCORE=0.45`는 아직 측정으로 정한 값이 아닙니다. nomic-embed-text로 평가를 돌린 뒤 조정해야 합니다.
+`MIN_RELEVANCE_SCORE=0.45`는 측정 후에도 **바꾸지 않았습니다**. 25문항의 top-1 cosine은 답이 있는 질문이 0.614~0.749, 거절해야 하는 질문이 0.730~0.807로 겹칩니다(벡터 단독 검색 기준, 가장 높은 값이 거절 대상 q25). 어떤 임계값도 둘을 가르지 못하고, 0.62 이상으로 올리면 거절 대상은 그대로 통과하고 답이 있는 q07부터 잘립니다. 한국어 코퍼스에서 nomic-embed-text의 cosine은 근거 판단에 쓸 수 없으므로 NO_EVIDENCE 단계는 사실상 동작하지 않고, 거절은 3단계(모델)와 1단계(정규식)가 맡습니다. 다국어 embedding 모델로 바꾼 뒤 다시 측정해야 합니다.
 
 ### DICOM Tag Analyzer
 
@@ -188,39 +189,65 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 |---|---|---|
 | 단위 | 텍스트 추출(MD 헤딩, CP949, PDF 페이지, 암호화/손상/스캔 PDF), chunker, 폴더 스캔, DICOM 규칙과 PHI 비노출, Ollama 재시도(respx), Semaphore 상한, 거절 정책, Anthropic SDK 오류 매핑, 가드레일, Provider 간 응답 동일성, 평가 지표 | pytest, respx, AsyncMock |
 | API | `/api/ask`, `/api/retrieve`, `/api/index`, `/api/dicom/analyze`, `/api/health`, 경로 탈출 차단(403), LLM 장애 시 503 | httpx `ASGITransport` |
-| 통합 | 인덱싱 파이프라인 → pgvector 저장 → 검색, 중복/실패/롤백, API로 인덱싱 후 질문하고 `ask_logs` 확인 | 실제 PostgreSQL 16 + pgvector |
+| 통합 | 인덱싱 파이프라인 → pgvector 저장 → 검색, 중복/실패/롤백, API로 인덱싱 후 질문하고 `ask_logs` 확인, embedding이 무너져도 pg_trgm 채널이 한국어 질문의 정답 chunk를 1위로 올리는지 | 실제 PostgreSQL 16 + pgvector |
 
 Ollama와 Claude는 모든 테스트에서 가짜 클라이언트로 대체합니다(실제 API 호출 없음).
 통합 테스트는 `TEST_DATABASE_URL`이 있으면 그 DB를, 없으면 testcontainers(`pgvector/pgvector:pg16`)를 쓰고, 둘 다 없으면 skip합니다.
 
-**실행 결과 (2026-10-05, macOS arm64)**
+**실행 결과 (2026-10-06, macOS arm64, Docker 실행 중)**
 
-- `make test`: **85 passed, 3 skipped**. skip 3건은 통합 테스트이고, Docker 데몬이 꺼져 있어 건너뛰었습니다.
-- 통합 테스트 3건은 `TEST_DATABASE_URL`로 로컬 PostgreSQL 16.2 + pgvector 0.6.2(pip 패키지 `pgserver`, 프로젝트 의존성 아님)에 붙여 **3 passed**를 확인했습니다. testcontainers 경로로는 Docker가 없어 실행하지 못했습니다.
+- `make test`: **91 passed, 0 skipped** (단위·API 87 + 통합 4). 통합 테스트는 testcontainers(`pgvector/pgvector:pg16`) 경로로 실행했습니다.
+- 이전 기록(2026-10-05): Docker가 꺼져 있어 85 passed, 3 skipped. 그때 통합 3건은 `TEST_DATABASE_URL`(로컬 `pgserver`)로 따로 3 passed를 확인했습니다.
 
 ---
 
 ## 평가 결과
 
 평가셋은 `eval/questions.yaml`의 25문항입니다. 문서에 답이 있는 질문이 19개(76%), 판독·진단·치료 요청이나 문서에 없는 내용이라 **거절해야 하는 질문**이 6개(24%)입니다.
-지표는 Retrieval hit@k, Section hit@k, Citation correctness, Keyword coverage, Refusal correctness, False refusal rate, 지연 시간 p50/p95, 토큰 수입니다.
+hit@k와 False refusal은 답이 있는 19문항, Refusal correctness는 거절 대상 6문항, Citation correctness와 Keyword coverage는 실제로 답한(거절하지 않은) 문항 기준입니다.
 
-| Provider | 상태 |
-|---|---|
-| ollama (gemma4:e4b + nomic-embed-text) | **실행 전**: 작성 환경에 embedding 모델(nomic-embed-text)이 설치되어 있지 않았습니다 |
-| anthropic (claude-opus-5-5) | **실행 전**: API 키 없음 |
+**실행 환경 (2026-10-06)**: Apple M5, 메모리 32GB, macOS. 호스트 Ollama 0.24.0(`gemma4:e4b` + `nomic-embed-text`), Docker의 `pgvector/pgvector:0.8.0-pg16`. Provider는 ollama만 실행했습니다. top_k=5, chunk 1000/150, `MIN_RELEVANCE_SCORE=0.45`, temperature 0.1.
 
-실행하지 않은 평가의 수치는 적지 않았습니다. `make eval`을 실행한 뒤 `eval/reports/`의 리포트로 이 표를 채우면 됩니다.
+```bash
+docker compose up -d db
+(cd backend && DATABASE_URL=postgresql+asyncpg://clinical:clinical@localhost:5432/clinical_rag_qa uv run alembic upgrade head)
+make seed
+make eval EVAL_ARGS=--reindex      # 첫 실행: 6개 문서 → 28 chunk 인덱싱 후 평가
+HYBRID_SEARCH=false make eval      # 벡터 단독(수정 전 동작) 재현
+make eval                          # 하이브리드(기본값)
+```
 
-부분 확인(smoke test, 지표 아님):
-- 로컬 PostgreSQL + pgvector와 로컬 Ollama(gemma4:e4b)로 API를 띄워 `/api/health`(embedding 모델 없음이 `degraded`로 보고됨), `/api/dicom/analyze`(Gemma 설명 생성 성공), OUT_OF_SCOPE 거절, embedding 모델이 없을 때 `503 OLLAMA_BAD_REQUEST`가 나오는 것을 확인했습니다.
-- gemma4:e4b가 structured output(JSON schema)으로 인용 `[1]`이 붙은 답을 돌려주고, 문서에 없는 질문에는 `insufficient_evidence=true`를 돌려주는 것을 확인했습니다.
+| 지표 | 벡터 단독 (수정 전) | 하이브리드 (pgvector + pg_trgm, RRF) |
+|---|---|---|
+| Retrieval hit@5 (파일 기준) | 63.2% (12/19) | **94.7%** (18/19) |
+| Section hit@5 | 31.6% | 68.4% |
+| Citation correctness | 85.7% (6/7) | 86.7% (13/15) |
+| Keyword coverage | 85.7% | 83.3% / 90.0% |
+| Refusal correctness | 100% (6/6) | 100% (6/6) |
+| False refusal rate | 63.2% (12/19) | **21.1%** (4/19) |
+| Retrieval p50 / p95 | 24 / 37 ms | 40~42 / 46~48 ms |
+| Generation p50 / p95 | 2,783 / 6,596 ms | 4,014~4,156 / 7,011~7,021 ms |
+| End-to-end p50 / p95 | 2,768 / 6,593 ms | 4,043~4,079 / 6,809~6,883 ms |
+| 질문 수 / 오류 | 25 / 0 | 25 / 0 |
+
+- 벡터 단독은 두 번 실행했고(`--reindex` 첫 실행, `HYBRID_SEARCH=false` 재실행) 검색·거절 지표가 같았습니다. 위 수치는 첫 실행입니다. 하이브리드도 두 번 실행했고, 범위로 적은 칸은 두 실행의 값입니다. 하이브리드에서 실행마다 달라진 지표는 Keyword coverage(83.3% → 90.0%)뿐이었습니다.
+- 하이브리드 쪽 생성 시간이 긴 것은 실제로 답을 쓰는 문항이 많아졌기 때문입니다(거절 답변은 짧음).
+- 원본 리포트는 `eval/reports/`에 생성됩니다(git에는 넣지 않음).
+- anthropic Provider는 실행하지 않았습니다(API 키 없음, 수치 없음).
+
+**남은 실패 사례 (하이브리드)**
+
+- **q15 "헬프데스크 운영 시간"**: `operator-faq.txt`에 질문 문장이 그대로 있고 pg_trgm 점수도 1.0(1위)인데 top-5에 들지 못했습니다. 이 chunk는 벡터 순위가 후보 20개 밖이라 RRF 점수가 1/61뿐이고, 벡터 1위인 무관한 chunk가 lexical 중간 순위만 받아도 이깁니다. 무너진 벡터 채널과 같은 가중치로 합치는 RRF의 한계입니다. 25문항에 맞춘 가중치 조정은 하지 않았습니다.
+- **q05 "최대 업로드 용량"**: 파일(`dicom-upload-guide.md`)은 맞혔지만 정답 섹션(Supported File Formats, pg_trgm 0.786로 1위)이 같은 이유로 top-5에서 빠져 모델이 거절했습니다. 파일 단위 hit@k가 섹션 누락을 가리는 사례입니다.
+- **q09, q10**: 정답 섹션(De-identification Policy)을 검색했는데도 gemma4:e4b가 "확인할 수 없습니다"라고 답했습니다. 근거가 표(`| PatientBirthDate | 삭제 |`)와 긴 섹션에 있어 소형 모델이 놓친 것으로 보입니다.
+- **q17 "SliceThickness 기준"**: 기대 출처는 프로토콜 PDF와 QA 체크리스트인데, 모델이 업로드 가이드의 권장 태그 섹션을 인용해 "5mm"이 빠진 답을 했습니다.
 
 ---
 
 ## 제한 사항
 
-- **End-to-end 실행과 평가 미완료**: embedding 모델이 없어 실제 문서 인덱싱과 RAG 평가를 실행하지 못했습니다. Docker 데몬이 꺼져 있어 이미지 빌드, `docker compose up`, 오프라인 번들 생성·설치, `verify-offline.sh`도 실행하지 않았습니다. compose 설정은 `docker compose config`로 문법만 검증했습니다.
+- **embedding 모델이 한국어를 지원하지 않음**: nomic-embed-text는 한글을 `[UNK]`로 처리합니다. 하이브리드 검색으로 보완했지만 근본 해결은 다국어 embedding 모델(예: bge-m3, 1024차원 → 새 마이그레이션 필요)입니다. 이번 평가 환경에서는 모델을 새로 받지 않았으므로 측정하지 않았습니다.
+- **미실행 항목**: RAG 평가는 호스트에서 `db` 컨테이너와 호스트 Ollama로 실행했습니다. api/ui 이미지 빌드, 전체 `docker compose up`, 오프라인 번들 생성·설치, `verify-offline.sh`는 아직 실행하지 않았습니다.
 - **폐쇄망 UI 포트**: Docker는 internal 네트워크에서 호스트 포트를 열지 못합니다. 그래서 ui만 `ui_edge` 브리지 네트워크에 추가로 연결했고, 이 때문에 ui 컨테이너는 이론상 외부로 나갈 수 있습니다(api·db·ollama는 불가). 완전히 차단하려면 호스트 방화벽이나 리버스 프록시를 함께 써야 합니다.
 - **OUT_OF_SCOPE 판별**은 정규식 휴리스틱이라 표현이 바뀌면 놓치거나 잘못 거절할 수 있습니다. 그래서 2·3단계 거절과 시스템 프롬프트로 한 번 더 막습니다.
 - **chunking**은 고정 크기(문자 수 기준)입니다. 표·목록 구조를 따로 처리하지 않습니다. 토큰 기준이나 표를 인식하는 chunking은 이후 버전에서 다룹니다.
