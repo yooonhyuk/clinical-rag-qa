@@ -98,6 +98,7 @@ async def run_provider(
             "chunk_size": settings.chunk_size,
             "chunk_overlap": settings.chunk_overlap,
             "min_relevance_score": settings.min_relevance_score,
+            "hybrid_search": settings.hybrid_search,
         }
         return outcomes, config
     finally:
