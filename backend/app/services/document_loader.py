@@ -10,6 +10,9 @@ SUPPORTED_EXTENSIONS: dict[str, str] = {
     ".markdown": "md",
     ".txt": "txt",
     ".pdf": "pdf",
+    ".xml": "xml",  # JATS full-text articles
+    ".html": "html",
+    ".htm": "html",
 }
 
 

@@ -3,7 +3,18 @@ from pathlib import Path
 import pymupdf
 import pytest
 
+from app.services.chunker import chunk_sections
 from app.services.text_extractor import ExtractionError, extract, extract_markdown
+
+
+def _multiline_pdf(path: Path, pages: list[list[str]]) -> Path:
+    doc = pymupdf.open()
+    for lines in pages:
+        page = doc.new_page()
+        for i, line in enumerate(lines):
+            page.insert_text((72, 72 + 18 * i), line)
+    doc.save(path)
+    return path
 
 
 def _pdf(path: Path, pages: list[str], **save_kwargs: object) -> Path:
@@ -42,8 +53,40 @@ def test_txt_and_cp949(tmp_path: Path) -> None:
 def test_pdf_pages_keep_page_numbers(tmp_path: Path) -> None:
     path = _pdf(tmp_path / "p.pdf", ["첫 페이지", "", "셋째 페이지 SliceThickness"])
     sections = extract(path, "pdf")
-    assert [s.page_number for s in sections] == [1, 3]  # blank page skipped
-    assert "SliceThickness" in sections[1].text
+    assert len(sections) == 1  # no headings: one section that spans pages 1 and 3
+    section = sections[0]
+    assert section.page_number == 1
+    offset = section.text.index("셋째")
+    assert section.page_at(0) == 1 and section.page_at(offset) == 3  # blank page skipped
+    chunks = chunk_sections(sections, size=100, overlap=10)
+    assert chunks[0].page_number == 1
+
+
+def test_pdf_korean_cid_font_is_decoded(tmp_path: Path) -> None:
+    """pymupdf's non-embedded "korea" font writes UniKS-UTF16-H; pypdf needs our CMap patch."""
+    path = _pdf(tmp_path / "k.pdf", ["한국어 본문 텍스트"])
+    assert "한국어 본문 텍스트" in extract(path, "pdf")[0].text
+
+
+def test_pdf_headings_split_sections_and_chunks_cite_their_page(tmp_path: Path) -> None:
+    path = _multiline_pdf(
+        tmp_path / "h.pdf",
+        [
+            ["Guideline Header", "1 Background", "Intro text on page one."],
+            ["Guideline Header", "4.2 Evaluation of activity", "ORR should be documented."],
+            ["Guideline Header", "4.2.1 Sub point", "Detail text."],
+        ],
+    )
+    sections = extract(path, "pdf")
+    titles = [s.section_title for s in sections]
+    assert titles == [
+        "1 Background",
+        "1 Background > 4.2 Evaluation of activity",
+        "1 Background > 4.2 Evaluation of activity > 4.2.1 Sub point",
+    ]
+    assert [s.page_number for s in sections] == [1, 2, 3]
+    # the running header repeats on every page and is removed
+    assert all("Guideline Header" not in s.text for s in sections)
 
 
 def test_pdf_without_text_layer_fails(tmp_path: Path) -> None:

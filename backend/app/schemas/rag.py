@@ -8,7 +8,7 @@ from app.schemas.common import CamelModel
 class QuestionRequest(CamelModel):
     question: str = Field(min_length=1, max_length=2000)
     top_k: int | None = Field(default=None, ge=1, le=20)
-    file_type: str | None = Field(default=None, pattern="^(md|txt|pdf)$")
+    file_type: str | None = Field(default=None, pattern="^(md|txt|pdf|xml|html)$")
 
 
 class SourceOut(CamelModel):
