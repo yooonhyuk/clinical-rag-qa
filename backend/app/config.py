@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     hybrid_search: bool = False
     rrf_k: int = Field(default=60, ge=1)
 
+    # OUT_OF_SCOPE (clinical-judgement request) detection, see services/scope_classifier.py.
+    # embedding = precise regex + kNN margin over rules/scope_exemplars.yaml (default)
+    # regex     = precise regex only;  mvp1 = the MVP-1 regex (baseline, over-refuses)
+    scope_classifier: Literal["embedding", "regex", "mvp1"] = "embedding"
+    # Refuse when mean top-k cosine(out_of_scope) - mean top-k cosine(in_scope) >= margin.
+    # Tuned on the exemplars only (leave-one-out max Youden J with bge-m3, k=3 -> 0.056), not on
+    # eval/scope_heldout.yaml. Re-run eval/run_scope_eval.py after changing model or exemplars.
+    scope_margin: float = Field(default=0.056, ge=-1.0, le=1.0)
+    scope_top_k: int = Field(default=3, ge=1)
+
     raw_docs_path: Path = Path("./data/raw-docs/documents")
     dicom_path: Path = Path("./data/raw-docs/dicom")
     samples_path: Path = Path("./samples")

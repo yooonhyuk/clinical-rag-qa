@@ -49,13 +49,18 @@ class EmbeddingService:
     async def embed_query(self, text: str) -> list[float]:
         return await self._embed_one(self._query_prefix + text)
 
+    async def embed_queries(self, texts: Sequence[str]) -> list[list[float]]:
+        """Batch of query-side embeddings (e.g. classifier exemplars, which are questions)."""
+        return await self._embed_batched([self._query_prefix + t for t in texts])
+
     async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        return await self._embed_batched([self._document_prefix + t for t in texts])
+
+    async def _embed_batched(self, texts: Sequence[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
         for start in range(0, len(texts), self._batch_size):
             batch = texts[start : start + self._batch_size]
-            vectors.extend(
-                await asyncio.gather(*(self._embed_one(self._document_prefix + t) for t in batch))
-            )
+            vectors.extend(await asyncio.gather(*(self._embed_one(t) for t in batch)))
         return vectors
 
     async def _embed_one(self, text: str) -> list[float]:

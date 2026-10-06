@@ -1,0 +1,98 @@
+# Labelled exemplars for the OUT_OF_SCOPE (clinical-judgement request) classifier.
+# See app/services/scope_classifier.py and eval/run_scope_eval.py.
+#
+# out_of_scope: requests for image reading, diagnosis, prognosis or treatment / dosing advice
+#               about a specific person, scan or result.
+# in_scope:     questions about documents, criteria definitions, guideline requirements, DICOM,
+#               de-identification and system operation - including look-alikes that use the
+#               same clinical vocabulary ("RECIST에서 PD 기준이 뭐야?") and must NOT be refused.
+#
+# These are training exemplars only. The held-out evaluation set (eval/scope_heldout.yaml) and
+# the RAG eval questions (eval/*questions.yaml) use different wording; keep it that way so the
+# measured precision/recall is not inflated.
+out_of_scope:
+  # Korean
+  - "이 CT에서 보이는 결절이 악성인가요?"
+  - "우리 엄마 MRI 결과지에 종괴가 있다는데 암인가요?"
+  - "환자 PET 영상 보고 림프종 재발인지 판단해 주세요"
+  - "이 흉부 CT 판독 소견 좀 써줘"
+  - "종양이 커졌는데 지금 항암제를 중단해야 할까요?"
+  - "면역항암제 쓰는 환자인데 다음 사이클 진행해도 되나요?"
+  - "이 환자에게 맞는 항암 요법을 추천해 주세요"
+  - "체중 60kg 환자에게 이 약 용량을 얼마로 줘야 해?"
+  - "결절 크기가 9mm면 조직검사를 해야 하나요?"
+  - "뇌 MRI에서 조영증강이 늘었는데 재발로 봐야 하나요?"
+  - "검사 수치가 이 정도면 수술해야 하는 상황인가요?"
+  - "제 폐 사진에 보이는 그림자가 뭔지 알려주세요"
+  - "이 병변은 양성일 가능성이 높나요?"
+  - "환자 상태를 보면 방사선 치료를 추가하는 게 좋을까?"
+  - "아버지가 폐암 4기인데 얼마나 사실 수 있나요?"
+  - "이 PET-CT 결과로 병기를 매겨 줘"
+  - "스테로이드를 줄여도 되는 환자인지 판단해줘"
+  - "목 림프절이 15mm인데 전이인가요?"
+  - "영상 첨부했어요. 진행인지 가성진행인지 봐주세요"
+  - "이 수치면 치료 반응이 좋은 건가요, 약을 바꿔야 하나요?"
+  # English
+  - "Is the nodule on this CT scan cancer?"
+  - "Can you read my MRI and tell me what is wrong?"
+  - "My patient's lesion grew 30%, should I switch to second-line therapy?"
+  - "What chemotherapy regimen should my patient start next week?"
+  - "Based on this PET, is the lymphoma back?"
+  - "How much temozolomide should I prescribe for a 70 kg man?"
+  - "Does this patient have progressive disease or pseudoprogression?"
+  - "Please interpret the attached chest X-ray."
+  - "Should we stop immunotherapy for this patient given the new lesions?"
+  - "Is my mother's tumor malignant based on the report?"
+  - "What is the prognosis for my father with glioblastoma?"
+  - "Which drug would you recommend for my relapsed lymphoma?"
+  - "Given SUVmax 9 in the liver, does the patient need a biopsy?"
+  - "Tell me if the enhancement on this brain MRI is recurrence."
+  - "Should the dose be reduced after grade 3 toxicity in my patient?"
+in_scope:
+  # Korean - criteria / guideline / document questions (incl. clinical vocabulary look-alikes)
+  - "RECIST 1.1에서 표적 병변은 장기당 몇 개까지 선택하나요?"
+  - "iRECIST의 iUPD는 어떤 경우에 판정하나요?"
+  - "Lugano 기준에서 Deauville 점수 1~3은 어떤 반응으로 분류하나요?"
+  - "RANO 2.0에서 기저 스캔은 언제 촬영하나요?"
+  - "가성진행(pseudoprogression)이 무엇인지 문서 기준으로 설명해줘"
+  - "결절 검출 AI 의료기기 임상시험에서 참조표준은 어떻게 정하나요?"
+  - "폐암 진단보조 소프트웨어 임상시험의 연구 설계는?"
+  - "항암제 1상 임상시험의 주요 목적은 무엇인가요?"
+  - "용량제한독성(DLT)의 정의는?"
+  - "중앙 판독(BICR)은 어떤 경우에 권고되나요?"
+  - "임상시험에서 판독자를 치료군에 대해 눈가림해야 하는 이유는?"
+  - "판독자 간 불일치는 어떻게 조정(adjudication)하나요?"
+  - "ICH GCP에서 근거문서가 갖춰야 할 요건은?"
+  - "시험자는 기본문서를 얼마나 보관해야 하나요?"
+  - "DICOM 비식별화에서 Patient's Name 태그는 어떻게 처리하나요?"
+  - "PS3.15 Basic Profile에서 Z 조치는 무슨 뜻인가요?"
+  - "종양 반응 평가 주기는 가이드라인에서 어떻게 정하나요?"
+  - "판독 결과 데이터 잠금(lock)은 언제 하나요?"
+  - "영상 판독 차터에 들어가야 할 항목은?"
+  - "무진행 생존(PFS) 평가에서 간격확인 진행이란?"
+  - "치료 반응 평가 기준에서 부분반응(PR)의 정의는?"
+  - "병변 크기 측정은 어떤 윈도우에서 하나요?"
+  - "임상시험 영상 업로드가 실패하면 무엇을 확인하나요?"
+  - "비식별화 후 남는 재식별 위험은 어떻게 평가하나요?"
+  - "이 시스템은 영상 판독을 하나요?"
+  # English
+  - "What is the definition of measurable disease in RANO 2.0?"
+  - "How does iRECIST confirm progression after iUPD?"
+  - "What Deauville score counts as complete metabolic response under Lugano?"
+  - "What does the FDA guidance say about blinding image readers to treatment assignment?"
+  - "How should an imaging charter describe the reader training process?"
+  - "What are the main objectives of a phase I dose-finding trial for cytotoxic drugs?"
+  - "When is blinded independent central review recommended for PFS?"
+  - "What action does the DICOM Basic Profile apply to Study Instance UID?"
+  - "What does the MIDI report recommend for burned-in annotations?"
+  - "How long must investigators retain essential records under ICH E6(R3)?"
+  - "What is pseudoprogression and how common is it in melanoma?"
+  - "Which response categories exist in RANO 2.0?"
+  - "How is minor response defined in RECIL?"
+  - "What should be standardized for an imaging-based primary endpoint?"
+  - "What is the role of the reference standard in an AI device trial?"
+  - "How are new lesions handled under iRECIST?"
+  - "What is the maximum number of target lesions per organ in iRECIST?"
+  - "What is the difference between pseudonymization and anonymization?"
+  - "Which file formats can be uploaded?"
+  - "Does the analyzer perform diagnosis?"

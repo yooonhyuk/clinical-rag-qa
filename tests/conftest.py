@@ -29,6 +29,9 @@ def settings(tmp_path: Path) -> Settings:
         min_relevance_score=0.3,
         embedding_query_prefix="",
         embedding_document_prefix="",
+        # hash-based fake embeddings carry no meaning; the embedding classifier is tested
+        # separately with controlled vectors (test_scope_classifier.py)
+        scope_classifier="regex",
     )
 
 

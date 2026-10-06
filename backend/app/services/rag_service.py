@@ -1,7 +1,8 @@
 """Retrieval-augmented question answering with source citations and a refusal policy.
 
 Refusal policy (checked in this order, the first two never call the LLM):
-1. OUT_OF_SCOPE      - the question asks for image reading / diagnosis / treatment.
+1. OUT_OF_SCOPE      - the question asks for image reading / diagnosis / treatment
+                       (scope_classifier: precise regex, then embedding kNN over exemplars).
 2. NO_EVIDENCE       - nothing retrieved, or the best cosine score < `min_score`.
 3. MODEL_REFUSED     - the LLM reports `insufficient_evidence` (structured output), answers
                        "문서에서 확인할 수 없습니다" without citations, or the provider declines.
@@ -14,6 +15,7 @@ import time
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +29,11 @@ from app.services.llm_types import (
     StructuredOutputError,
 )
 from app.services.prompt_builder import build_rag_prompt
+from app.services.scope_classifier import (
+    MVP1_OUT_OF_SCOPE_RE,
+    RegexScopeClassifier,
+    ScopeDecision,
+)
 from app.services.vector_search_service import RetrievedChunk, search_chunks
 
 REFUSAL_MESSAGE = "문서에서 확인할 수 없습니다."
@@ -35,13 +42,6 @@ OUT_OF_SCOPE_MESSAGE = (
     "문서·업로드·QA 운영 관련 질문만 답변할 수 있습니다."
 )
 
-# Heuristic guard for clinical-judgement requests. Deliberately narrow: it should catch
-# "is there a nodule in this CT?" but not "does the analyzer perform image reading?".
-_OUT_OF_SCOPE_RE = re.compile(
-    r"(결절|병변|종양|암\s*(이|인지|일까|여부)|악성|양성인지|"
-    r"진단(해|을\s*내려|명)|판독\s*(해|결과|소견)|소견(을|이)\s*(알려|뭐)|"
-    r"처방|투약|복용|용량을|치료\s*(방법|법|해야)|어떤\s*약)"
-)
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
 
 
@@ -69,8 +69,19 @@ class AskResult:
 SearchFn = Callable[..., Awaitable[list[RetrievedChunk]]]
 
 
+class ScopeClassifier(Protocol):
+    needs_vector: bool
+
+    def precheck(self, question: str) -> ScopeDecision | None: ...
+
+    async def classify(
+        self, question: str, query_vector: list[float] | None = None
+    ) -> ScopeDecision: ...
+
+
 def is_out_of_scope(question: str) -> bool:
-    return bool(_OUT_OF_SCOPE_RE.search(question))
+    """MVP-1 regex (kept for callers/tests; RagService uses its ScopeClassifier)."""
+    return bool(MVP1_OUT_OF_SCOPE_RE.search(question))
 
 
 def is_model_refusal(answer: str) -> bool:
@@ -106,6 +117,7 @@ class RagService:
         hybrid: bool = True,
         rrf_k: int = 60,
         search: SearchFn = search_chunks,
+        scope: ScopeClassifier | None = None,
     ) -> None:
         self._embeddings = embeddings
         self._llm = llm
@@ -114,6 +126,7 @@ class RagService:
         self._hybrid = hybrid
         self._rrf_k = rrf_k
         self._search = search
+        self._scope: ScopeClassifier = scope or RegexScopeClassifier()
 
     @property
     def provider(self) -> str:
@@ -130,6 +143,21 @@ class RagService:
     ) -> tuple[list[RetrievedChunk], int]:
         start = time.perf_counter()
         query_vector = await self._embeddings.embed_query(question)
+        return await self._retrieve_with(
+            session, question, query_vector, start, top_k=top_k, file_type=file_type, corpus=corpus
+        )
+
+    async def _retrieve_with(
+        self,
+        session: AsyncSession,
+        question: str,
+        query_vector: list[float],
+        start: float,
+        *,
+        top_k: int,
+        file_type: str | None,
+        corpus: str | None,
+    ) -> tuple[list[RetrievedChunk], int]:
         chunks = await self._search(
             session,
             query_vector,
@@ -151,15 +179,21 @@ class RagService:
         file_type: str | None = None,
         corpus: str | None = None,
     ) -> AskResult:
-        if is_out_of_scope(question):
-            result = self._refusal(
-                OUT_OF_SCOPE_MESSAGE, RefusalReason.OUT_OF_SCOPE, retrieved=[], retrieval_ms=0
-            )
-            await self._log(session, question, result)
-            return result
+        # Layer 1 (precise regex) refuses before any model call.
+        if decision := self._scope.precheck(question):
+            return await self._out_of_scope(session, question, decision, retrieval_ms=0)
 
-        retrieved, retrieval_ms = await self.retrieve(
-            session, question, top_k=top_k, file_type=file_type, corpus=corpus
+        start = time.perf_counter()
+        query_vector = await self._embeddings.embed_query(question)
+        # Layer 2 (embedding kNN) reuses the query vector that retrieval needs anyway.
+        decision = await self._scope.classify(question, query_vector)
+        if decision.out_of_scope:
+            return await self._out_of_scope(
+                session, question, decision, retrieval_ms=_elapsed_ms(start)
+            )
+
+        retrieved, retrieval_ms = await self._retrieve_with(
+            session, question, query_vector, start, top_k=top_k, file_type=file_type, corpus=corpus
         )
         evidence = [c for c in retrieved if c.score >= self._min_score]
         if not evidence:
@@ -170,10 +204,25 @@ class RagService:
                 retrieval_ms=retrieval_ms,
             )
             result.meta["topScore"] = retrieved[0].score if retrieved else None
+            result.meta["scope"] = {"method": decision.method, "score": decision.score}
             await self._log(session, question, result)
             return result
 
         result = await self._generate(question, evidence, retrieved, retrieval_ms)
+        result.meta["scope"] = {"method": decision.method, "score": decision.score}
+        await self._log(session, question, result)
+        return result
+
+    async def _out_of_scope(
+        self, session: AsyncSession, question: str, decision: ScopeDecision, *, retrieval_ms: int
+    ) -> AskResult:
+        result = self._refusal(
+            OUT_OF_SCOPE_MESSAGE,
+            RefusalReason.OUT_OF_SCOPE,
+            retrieved=[],
+            retrieval_ms=retrieval_ms,
+        )
+        result.meta["scope"] = {"method": decision.method, "score": decision.score}
         await self._log(session, question, result)
         return result
 

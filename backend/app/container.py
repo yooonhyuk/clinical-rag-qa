@@ -15,7 +15,13 @@ from app.services.llm_guardrail import validate_provider
 from app.services.llm_types import GenerationClient
 from app.services.ollama_client import OllamaClient
 from app.services.prompt_builder import load_prompt
-from app.services.rag_service import RagService
+from app.services.rag_service import RagService, ScopeClassifier
+from app.services.scope_classifier import (
+    EmbeddingScopeClassifier,
+    Mvp1RegexScopeClassifier,
+    RegexScopeClassifier,
+    ScopeExemplars,
+)
 
 
 @dataclass
@@ -53,6 +59,21 @@ def build_generator(settings: Settings, ollama: OllamaClient) -> GenerationClien
             refusal_fallback=settings.anthropic_refusal_fallback,
         )
     return ollama
+
+
+def build_scope_classifier(settings: Settings, embeddings: EmbeddingService) -> ScopeClassifier:
+    match settings.scope_classifier:
+        case "regex":
+            return RegexScopeClassifier()
+        case "mvp1":
+            return Mvp1RegexScopeClassifier()
+        case _:
+            return EmbeddingScopeClassifier(
+                embeddings,
+                ScopeExemplars.load(settings.rules_path / "scope_exemplars.yaml"),
+                margin=settings.scope_margin,
+                k=settings.scope_top_k,
+            )
 
 
 def build_container(
@@ -106,6 +127,7 @@ def build_container(
             min_score=settings.min_relevance_score,
             hybrid=settings.hybrid_search,
             rrf_k=settings.rrf_k,
+            scope=build_scope_classifier(settings, embeddings),
         ),
         dicom=DicomService(
             dicom_llm,

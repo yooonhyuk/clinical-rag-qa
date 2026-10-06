@@ -11,7 +11,7 @@ EVAL_DATABASE_URL ?= postgresql+asyncpg://clinical:clinical@localhost:5432/clini
 EVAL_OLLAMA_URL   ?= http://localhost:11434
 
 .PHONY: help setup samples seed lint format test test-unit test-integration \
-        up up-host-ollama down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline \
+        up up-host-ollama down logs pull-models migrate reset-embeddings index eval scope-eval api ui bundle offline-up verify-offline \
         dicom-scan dicom-rules corpus-verify fetch-originals
 
 help:  ## list targets
@@ -89,6 +89,9 @@ index:  ## index data/raw-docs/documents through the API
 eval:  ## run the RAG eval (needs DB + Ollama reachable; see README). PROVIDERS="ollama anthropic"
 	DATABASE_URL=$(EVAL_DATABASE_URL) OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) \
 	$(UV) python eval/run_eval.py $(foreach p,$(or $(PROVIDERS),ollama),--provider $(p)) $(EVAL_ARGS)
+
+scope-eval:  ## B6: OUT_OF_SCOPE classifier precision/recall on eval/scope_heldout.yaml (host Ollama)
+	OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) $(UV) python eval/run_scope_eval.py
 
 api:  ## run the API locally (hot reload)
 	cd backend && uv run uvicorn app.main:app --reload --port 8000
