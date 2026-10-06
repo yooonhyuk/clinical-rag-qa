@@ -51,24 +51,30 @@ async def analyze(
             file_path=analysis.file_path,
             checksum=analysis.checksum,
             status="ANALYZED",
-            tags=analysis.tag_summary,
+            tags=analysis.stored_tags(),
             privacy_warnings=analysis.privacy_warnings,
             missing_required_tags=analysis.missing_required_tags,
         )
     )
     await session.commit()
-    return DicomAnalyzeResponse(
-        file_name=analysis.file_name,
-        summary=analysis.summary,
-        summary_source=analysis.summary_source,
-        tag_summary=analysis.tag_summary,
-        privacy_warnings=analysis.privacy_warnings,
-        missing_required_tags=analysis.missing_required_tags,
-        qa_result=QAResult(
-            passed=analysis.passed,
-            warnings=analysis.warnings,
-            missing=analysis.missing_required_tags,
-        ),
-        rule_source=analysis.rule_source,
-        disclaimer=DISCLAIMER,
+    return DicomAnalyzeResponse.model_validate(
+        {
+            "file_name": analysis.file_name,
+            "summary": analysis.summary,
+            "summary_source": analysis.summary_source,
+            "tag_summary": analysis.tag_summary,
+            "layer1": analysis.layer1,
+            "layer2": analysis.layer2,
+            "quantitation_readiness": analysis.quantitation_readiness,
+            "counts": analysis.counts,
+            "privacy_warnings": analysis.privacy_warnings,
+            "missing_required_tags": analysis.missing_required_tags,
+            "qa_result": QAResult(
+                passed=analysis.passed,
+                warnings=analysis.warnings,
+                missing=analysis.missing_required_tags,
+            ),
+            "rule_source": analysis.rule_source,
+            "disclaimer": DISCLAIMER,
+        }
     )

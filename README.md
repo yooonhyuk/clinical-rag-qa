@@ -3,13 +3,13 @@
 **Local-first 의료문서 RAG + DICOM Tag Analyzer** — 포트폴리오 프로젝트 (MVP-1)
 
 임상시험 문서(Markdown/TXT/텍스트 PDF)를 로컬에서 인덱싱하고, 질문에 **출처를 붙여** 답하며, 근거가 부족하면 **답변을 거절**합니다.
-DICOM 파일은 픽셀을 읽지 않고 태그만 분석해 필수 태그 누락과 개인정보 가능 태그를 규칙 기반으로 검사합니다.
+DICOM 파일은 픽셀을 읽지 않고 태그만 분석해, DICOM 표준 원문(PS3.3 / PS3.15, 2026d)에서 생성한 규칙으로 **표준 적합성(Layer 1)** 과 **비식별화(Layer 2)** 를 검사합니다.
 기본 구성은 외부 네트워크 없이 동작하며, 폐쇄망 설치용 오프라인 번들을 포함합니다.
 
 > 모든 샘플 문서와 DICOM은 직접 만든 **가상 데이터**입니다(`TEST^PATIENT` 같은 가짜 값). 실제 환자 데이터나 회사 문서는 쓰지 않습니다.
 > 이 시스템은 영상 판독·진단·치료 조언을 하지 않습니다.
 
-기획서(v0.3) 기준 MVP-1 범위를 구현했습니다. 기술 스택은 Python 3.12, FastAPI(async), SQLAlchemy 2.0 async + asyncpg, Alembic, PostgreSQL 16 + pgvector, httpx.AsyncClient, Ollama(Gemma, bge-m3 embedding), PyMuPDF, pydicom, Streamlit, pytest, uv, Docker Compose입니다.
+기획서(v0.4) 기준 MVP-1 범위를 구현했습니다. 기술 스택은 Python 3.12, FastAPI(async), SQLAlchemy 2.0 async + asyncpg, Alembic, PostgreSQL 16 + pgvector, httpx.AsyncClient, Ollama(Gemma, bge-m3 embedding), PyMuPDF, pydicom, Streamlit, pytest, uv, Docker Compose입니다.
 
 ---
 
@@ -23,7 +23,7 @@ flowchart LR
             direction TB
             R["/api/ask · /api/retrieve"] --> RAG["RagService<br/>거절 정책 · 인용"]
             I["/api/index"] --> P["IndexingPipeline<br/>to_thread 파싱 → chunk → embed"]
-            D["/api/dicom/analyze"] --> DS["DicomService<br/>pydicom stop_before_pixels<br/>+ YAML 규칙"]
+            D["/api/dicom/analyze"] --> DS["DicomService<br/>pydicom stop_before_pixels<br/>L1 PS3.3 적합성 · L2 PS3.15 비식별화"]
             P --> ES["EmbeddingService<br/>Semaphore(EMBED_CONCURRENCY)"]
             RAG --> ES
             RAG --> GEN{{"GenerationClient"}}
@@ -46,21 +46,27 @@ backend/app/
   api/        documents.py rag.py dicom.py health.py deps.py
   services/   document_loader · text_extractor · chunker · embedding_service
               vector_search_service · rag_service · prompt_builder
-              embedding_schema · dicom_service · dicom_rules · indexing_pipeline
+              embedding_schema · indexing_pipeline
+              dicom_service · dicom_rules · dicom_safe(출력 allowlist)
+              dicom_conformance(Layer 1) · dicom_deid(Layer 2) · dicom_findings
               ollama_client · anthropic_client · llm_types · llm_guardrail
   models/     document chunk dicom_file index_job ask_log (SQLAlchemy 2.0)
   schemas/    Pydantic (camelCase 응답)
   prompts/    rag_prompt.txt dicom_summary_prompt.txt
-  rules/      required_tags.yaml privacy_tags.yaml
+  rules/      standard/ps3.3_iod.yaml · standard/ps3.15_e1-1_deid.yaml (표준에서 생성)
+              deid_policy.yaml (사이트 정책)
+  cli/        dicom_scan.py (폴더 일괄 검사)
 backend/alembic/versions/  0001_initial_schema · 0002_ask_log_llm_usage · 0003_pg_trgm
                            0004_embedding_model_tracking
 frontend/streamlit_app.py
 eval/       questions.yaml (25문항) · eval_metrics.py · run_eval.py · reports/
 tests/      unit/ (API 테스트 포함) · integration/ (PostgreSQL + pgvector)
 offline-bundle/  build-bundle.sh · install.sh · verify-offline.sh
-samples/    documents/ (가상 문서 6종 + .corpus.yaml) · dicom/ (합성 DICOM 3종)
+samples/    documents/ (가상 문서 6종 + .corpus.yaml) · dicom/ (합성 DICOM 9종)
 scripts/    generate_sample_dicom.py · generate_sample_pdf.py
+            build_iod_rules.py · build_deid_rules.py · dicom_docbook.py (표준 → 규칙 YAML)
             diagnose_embedding.py (토크나이저/cosine 진단) · reset_embeddings.py
+docs/       dicom-rules.md (DICOM 2계층 규칙 설계·출처·한계)
 docs/issues/  001-korean-embedding-unk.md · 002-dicom-free-text-phi-to-llm.md
 ```
 
@@ -186,12 +192,18 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 
 `MIN_RELEVANCE_SCORE=0.45`는 bge-m3로 다시 측정한 뒤에도 **바꾸지 않았습니다**. bge-m3(벡터 단독)에서 retrieved chunk의 최대 cosine은 답이 있는 질문이 0.555~0.753, 거절해야 하는 질문이 0.428~0.651입니다. nomic-embed-text 때(0.614~0.749 vs 0.730~0.807)보다 훨씬 잘 갈라지지만, 문서와 주제가 같은 거절 대상 q25(0.651)가 답이 있는 q10(0.555)·q15·q16보다 높아 완전히 분리되지는 않습니다. q25를 빼면 0.453~0.555 사이에 경계를 둘 수 있지만, 거절 대상이 6문항뿐이라 25문항에 맞춘 값은 과적합 위험이 큽니다. 지금 0.45는 답이 있는 모든 문항보다 낮고, 문서에 없는 q24(0.428)를 LLM 호출 없이 거절합니다. nomic 때와 달리 NO_EVIDENCE 단계가 실제로 동작합니다.
 
-### DICOM Tag Analyzer
+### DICOM Tag Analyzer (2계층 규칙)
+
+설계, 출처, 커버리지, 한계는 [docs/dicom-rules.md](docs/dicom-rules.md)에 정리했습니다.
 
 - `pydicom.dcmread(path, stop_before_pixels=True)`로 픽셀은 읽지 않습니다. 테스트에서 이 인자가 실제로 넘어가는지 확인합니다.
-- 필수 태그(공통, CT/MR 추가)와 개인정보 가능 태그는 `rules/*.yaml`에 정의합니다.
-- **출력 allowlist**(`dicom_safe.py`): 응답·DB `tags`·LLM 프롬프트에는 명시적으로 허용한 코드/숫자 값(Modality, Rows/Columns, PixelSpacing, SliceThickness, SOP Class 이름 등)만 들어갑니다. 형식 검사를 통과하지 못한 값과 그 외 모든 속성(이름, 날짜, UID, 설명 같은 자유 텍스트, private tag, sequence)은 `exists` / `empty` / `absent`로만 보고합니다([이슈 002](docs/issues/002-dicom-free-text-phi-to-llm.md)).
-- 설명은 로컬 Gemma가 만들고, Ollama 장애 시에는 결정적 템플릿으로 대체합니다. 응답에는 항상 "영상 판독 아님" 안내 문구를 붙입니다.
+- **규칙은 표준 원문에서 생성합니다.** `scripts/build_iod_rules.py`와 `build_deid_rules.py`가 dicom.nema.org의 DocBook XML(PS3.3 / PS3.15 / PS3.16 **2026d**, 2026-10-06 수집)에서 표를 추출해 `rules/standard/*.yaml`을 만듭니다. 파일 머리말에 판, URL, 수집일, 원본 SHA-256을 남깁니다(`make dicom-rules`로 재생성).
+- **Layer 1 — 표준 적합성(PS3.3/PS3.5)**: SOP Class UID(없으면 Modality)로 IOD를 정하고(CT, MR, Enhanced CT/MR/PET, PET, US, US Multi-frame, Secondary Capture, CR, DX — 11종), 필수(M) 모듈의 Type 1(존재+값)과 Type 2(존재)를 검사합니다. 1C/2C는 "조건부 – 미평가"로 보고합니다. Enhanced 멀티프레임은 Shared/Per-frame Functional Group에서 Pixel Measures·Plane Position·Plane Orientation을 찾습니다. UI·DA·TM·CS 값 형식과 Modality·Body Part Examined Defined Terms도 확인합니다.
+- **정량 준비도**: PET이면 SUV 계산에 필요한 태그(PatientWeight, 방사성의약품 정보, Units, DecayCorrection, SeriesTime)를 적합성과 별도의 경고로 보고합니다.
+- **Layer 2 — 비식별화(PS3.15 Annex E)**: Table E.1-1의 조치(D/Z/X/K/C/U와 조합)를 sequence 내부까지 재귀로 적용하고, private tag, 파일의 비식별화 선언(0012,0062~0064, CID 7050), 가명 정책(YAML 정규식), BurnedInAnnotation·고위험 Modality, 날짜 옵션을 판정합니다.
+- **출력 allowlist**(`dicom_safe.py`): 응답·DB `tags`·LLM 프롬프트에는 명시적으로 허용한 코드/숫자 값(Modality, Rows/Columns, PixelSpacing, SliceThickness, SOP Class 이름 등, 코드 값은 Defined Terms 안의 값만)만 들어갑니다. 그 외 속성은 `exists` / `empty` / `absent`로만, finding은 코드·표준 키워드·건수·출처로만 보고합니다([이슈 002](docs/issues/002-dicom-free-text-phi-to-llm.md)). pydicom의 값 검증 경고도 값을 인용하므로 꺼 두고 Layer 1이 대신 검사합니다.
+- 설명은 로컬 Gemma가 allowlist 요약과 finding 코드/건수만 보고 만듭니다. Ollama 장애 시와 외부 Provider 모드에서는 결정적 템플릿을 씁니다. 응답에는 항상 "영상 판독 아님" 안내 문구를 붙입니다.
+- **폴더 일괄 검사**: `make dicom-scan DIR=<폴더>` (= `uv run --project backend python -m app.cli.dicom_scan <폴더>`). 공개 데이터(TCIA 등)를 받아 그대로 돌릴 수 있습니다. `--json out.jsonl`, `--redact-paths`, `--fail-on error`를 지원합니다.
 
 ### 선택 기능: Claude API 생성 Provider (opt-in)
 
@@ -210,7 +222,7 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 
 | 구분 | 내용 | 도구 |
 |---|---|---|
-| 단위 | embedding 모델별 차원·prefix 해석과 잘못된 차원 거부, health의 embedding 인덱스 판정, 텍스트 추출(MD 헤딩, CP949, PDF 페이지, 암호화/손상/스캔 PDF), chunker, 폴더 스캔, DICOM 규칙과 PHI 비노출, Ollama 재시도(respx), Semaphore 상한, 거절 정책, Anthropic SDK 오류 매핑, 가드레일, Provider 간 응답 동일성, 평가 지표 | pytest, respx, AsyncMock |
+| 단위 | embedding 모델별 차원·prefix 해석과 잘못된 차원 거부, health의 embedding 인덱스 판정, 텍스트 추출(MD 헤딩, CP949, PDF 페이지, 암호화/손상/스캔 PDF), chunker, 폴더 스캔, DICOM Layer 1(IOD 11종 결정, Type 1/2, Functional Group, UI/DA/TM, Defined Terms, PET SUV)·Layer 2(E.1-1 조치·조합 해석, 중첩 sequence, private, 선언·가명·픽셀 위험·날짜 옵션)·PHI 비노출(응답·DB·프롬프트·로그), 규칙 생성기 파서, 폴더 스캔 CLI, Ollama 재시도(respx), Semaphore 상한, 거절 정책, Anthropic SDK 오류 매핑, 가드레일, Provider 간 응답 동일성, 평가 지표 | pytest, respx, AsyncMock |
 | API | `/api/ask`, `/api/retrieve`, `/api/index`, `/api/dicom/analyze`, `/api/health`, 경로 탈출 차단(403), LLM 장애 시 503 | httpx `ASGITransport` |
 | 통합 | 인덱싱 파이프라인 → pgvector 저장 → 검색, 중복/실패/롤백, API로 인덱싱 후 질문하고 `ask_logs` 확인, embedding이 무너져도 pg_trgm 채널이 한국어 질문의 정답 chunk를 1위로 올리는지, 다른 embedding 모델의 chunk 제외·health 불일치 보고·자동 재embedding, 0004 마이그레이션의 차원 변경(768↔1024)·벡터 삭제·HNSW 재생성·REINDEX_REQUIRED | 실제 PostgreSQL 16 + pgvector |
 
@@ -219,7 +231,8 @@ Ollama와 Claude는 모든 테스트에서 가짜 클라이언트로 대체합�
 
 **실행 결과 (2026-10-06, macOS arm64, Docker 실행 중)**
 
-- `make test`: **107 passed, 0 skipped** (단위·API 101 + 통합 6). 통합 테스트는 testcontainers(`pgvector/pgvector:pg16`) 경로로 실행했습니다.
+- `make test`: **188 passed, 0 skipped** (단위·API 182 + 통합 6). 통합 테스트는 testcontainers(`pgvector/pgvector:pg16`) 경로로 실행했습니다.
+- DICOM 규칙 재구성(#2, #3) 전: 107 passed (단위·API 101 + 통합 6).
 - bge-m3 전환 전: 91 passed (단위·API 87 + 통합 4).
 - 이전 기록(2026-10-05): Docker가 꺼져 있어 85 passed, 3 skipped. 그때 통합 3건은 `TEST_DATABASE_URL`(로컬 `pgserver`)로 따로 3 passed를 확인했습니다.
 
@@ -285,4 +298,5 @@ HYBRID_SEARCH=true  make eval
 - `/api/index`는 동기 실행입니다(요청이 인덱싱 완료까지 대기). 목표인 100개 이하 문서에서는 문제없지만, 규모가 커지면 작업 큐(arq 등)가 필요합니다.
 - embedding 차원을 바꾸면 기존 벡터를 모두 지우고 재인덱싱해야 합니다(`make reset-embeddings` → `make index`). 그 사이에는 검색 결과가 비고, `/api/health`가 `embeddingIndex` 불일치로 `degraded`를 보고합니다. 설정한 차원과 모델이 실제로 내는 차원이 다르면 인덱싱은 `EMBEDDING_DIM_MISMATCH`로 실패합니다.
 - anthropic 모드의 가드레일은 "표식이 붙은 폴더만 인덱싱한다"까지 보장합니다. 이전에 ollama 모드로 인덱싱해 DB에 이미 들어 있는 문서까지 검사하지는 않으므로, Provider를 바꿀 때는 DB를 새로 만드는 것을 권장합니다.
-- 스캔 PDF(OCR), DOCX·Excel, 문서 기반 업로드 기준 비교, QC 시나리오 생성은 MVP-2 범위입니다.
+- **DICOM 규칙**: 파일 단위 검사입니다(series/study 일관성은 다음 단계). Type 1C/2C와 조건부 모듈은 평가하지 않고, 더미 치환·UID 치환·정제 여부는 파일 하나로 확인할 수 없어 참고로만 보고합니다. 픽셀은 읽지 않으므로 픽셀 내 식별정보는 위험 표시만 합니다. 합성 샘플로만 테스트했고 실제 공개 DICOM은 아직 돌리지 않았습니다. 자세한 내용은 [docs/dicom-rules.md](docs/dicom-rules.md#6-한계).
+- 스캔 PDF(OCR), DOCX·Excel, 문서 기반 업로드 기준 비교(DICOM Layer 3), QC 시나리오 생성은 MVP-2 범위입니다.

@@ -138,17 +138,70 @@ with tab_dicom:
         if result:
             st.markdown(result["summary"])
             st.caption(f"설명 생성: {result['summarySource']} · 규칙: {result['ruleSource']}")
-            left, right = st.columns(2)
-            left.subheader("태그 요약")
-            left.json(result["tagSummary"])
-            qa = result["qaResult"]
-            right.subheader("통과")
-            right.write(", ".join(qa["passed"]) or "-")
-            right.subheader("주의 (개인정보)")
-            for w in qa["warnings"]:
-                right.warning(w)
-            right.subheader("누락")
-            for m in qa["missing"]:
-                right.error(m)
-            if not qa["missing"]:
-                right.write("없음")
+            counts = result["counts"]
+            iod = result["layer1"]["iod"]
+            cols = st.columns(4)
+            cols[0].metric("IOD", iod["name"] or "미확인", help=iod.get("source"))
+            cols[1].metric(
+                "Layer 1 적합성 오류", counts["layer1"]["error"], help=result["layer1"]["standard"]
+            )
+            cols[2].metric(
+                "Layer 2 비식별화 오류/경고",
+                f"{counts['layer2']['error']} / {counts['layer2']['warning']}",
+                help=result["layer2"]["profileEdition"],
+            )
+            qr = result["quantitationReadiness"]
+            cols[3].metric(
+                "PET SUV 준비도",
+                "해당 없음" if not qr["applicable"] else ("준비됨" if qr["ready"] else "부족"),
+            )
+
+            def show_findings(findings: list[dict[str, Any]]) -> None:
+                rows = [
+                    {
+                        "심각도": f["severity"],
+                        "코드": f["code"],
+                        "속성": f.get("attribute") or "",
+                        "태그": f.get("tag") or "",
+                        "조치": f.get("action") or "",
+                        "건수": f["count"],
+                        "내용": f["message"],
+                        "근거": f["source"],
+                        "위치": ", ".join(f.get("paths") or []),
+                    }
+                    for f in findings
+                ]
+                if rows:
+                    st.dataframe(rows, use_container_width=True, hide_index=True)
+                else:
+                    st.write("없음")
+
+            t1, t2, t3, t4 = st.tabs(
+                ["Layer 1 · 표준 적합성", "Layer 2 · 비식별화", "PET 정량 준비도", "태그 요약"]
+            )
+            with t1:
+                st.caption(
+                    f"{result['layer1']['standard']} · IOD 결정: {iod.get('determinedBy') or '-'}"
+                )
+                show_findings(result["layer1"]["findings"])
+            with t2:
+                claim = result["layer2"]["claimedDeid"]
+                methods = ", ".join(m["meaning"] for m in claim["methodCodes"]) or "-"
+                options = ", ".join(
+                    f"{o['name']} ({o['origin']})" for o in result["layer2"]["optionsApplied"]
+                )
+                st.caption(
+                    f"{result['layer2']['profile']} · {result['layer2']['profileEdition']} · "
+                    f"PatientIdentityRemoved: {claim['patientIdentityRemoved']} · "
+                    f"선언된 방법: {methods} · 적용 옵션: {options or '없음(기본 프로파일)'}"
+                )
+                show_findings(result["layer2"]["findings"])
+            with t3:
+                if qr["applicable"]:
+                    st.caption(qr.get("label") or "")
+                    show_findings(qr["findings"])
+                else:
+                    st.write("PET 영상이 아니어서 해당 없음")
+            with t4:
+                st.caption("허용된 코드/숫자 값만 표시합니다. 그 외 속성은 존재 여부만 표시합니다.")
+                st.json(result["tagSummary"])

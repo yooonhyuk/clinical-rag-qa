@@ -1,0 +1,35 @@
+# Site / study de-identification policy for Layer 2 (PS3.15 Annex E). Edit per project.
+# The profile itself (actions per attribute) is generated from the standard:
+#   rules/standard/ps3.15_e1-1_deid.yaml  (scripts/build_deid_rules.py)
+version: 1
+
+# Profile options the site applies on top of the Basic Application Level Confidentiality
+# Profile (keys = Table E.1-1 option columns). Default: none (Basic Profile only).
+#   retain_safe_private, retain_uids, retain_device_identity, retain_institution_identity,
+#   retain_patient_characteristics, retain_longitudinal_full_dates,
+#   retain_longitudinal_modified_dates, clean_descriptors, clean_structured_content,
+#   clean_graphics
+# Dates: with neither "retain_longitudinal_*" option, dates/times follow the Basic Profile
+# (mostly Z / X / D). Trials that keep the time axis usually choose
+# retain_longitudinal_modified_dates (dates shifted -> action C = "verify shifted").
+options: []
+
+# Also evaluate options the file itself declares in
+# De-identification Method Code Sequence (0012,0064) (CID 7050 codes).
+honor_claimed_options: true
+
+# Pseudonymised values that count as compliant (not a warning) although the profile action
+# is Z (empty or dummy). Patterns are full-match regular expressions; values are never shown.
+# Default subject ID format: <STUDY>-<SITE>-<SUBJECT>, e.g. DEMO-001-0001.
+pseudonymization:
+  PatientID:
+    pattern: '^[A-Z0-9]{2,12}-[0-9]{3}-[0-9]{3,5}$'
+    allow_empty: true
+  PatientName:
+    pattern: '^[A-Z0-9]{2,12}-[0-9]{3}-[0-9]{3,5}$'
+    allow_empty: true
+
+# When Burned In Annotation (0028,0301) is absent, these modalities are flagged as
+# "pixel PHI risk - manual/OCR check recommended" (pixel data is never read).
+# DX/CR are optional (scanned requisitions / film markers); remove them if not wanted.
+burned_in_high_risk_modalities: [US, ES, XC, SC, OT, DX, CR]

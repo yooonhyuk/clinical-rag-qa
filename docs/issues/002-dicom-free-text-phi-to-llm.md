@@ -43,7 +43,9 @@
 - 확인 대상: `evaluate()` 결과, `DicomService` 결과와 LLM 프롬프트, HTTP 응답 본문 전체, DB에 저장되는 행.
 - ollama 경로(프롬프트 1회 생성, PHI 없음)와 anthropic 경로(프롬프트 0회, 템플릿 설명) 모두 확인합니다.
 
-## 남은 한계
+## 후속 조치 (#3에서 반영)
 
-- 대문자 이름처럼 CS 형식을 만족하는 자유 텍스트(`BodyPartExamined = "HONG GILDONG"`)는 형식 검사만으로 걸러지지 않습니다. 이후 Layer 1 재구성([#3](https://github.com/yooonhyuk/clinical-rag-qa/issues/3))에서 표준 Defined Terms와 대조하도록 강화합니다.
-- 이 수정은 **출력 경계**만 다룹니다. 파일 자체가 비식별화 기준을 만족하는지는 Layer 2(PS3.15 Annex E) 검사의 몫입니다.
+- 대문자 이름처럼 CS 형식을 만족하는 자유 텍스트(`BodyPartExamined = "HONG GILDONG"`)는 형식 검사만으로 걸러지지 않았습니다. [#3](https://github.com/yooonhyuk/clinical-rag-qa/issues/3)에서 Modality는 PS3.3 C.7.3.1.1.1, Body Part Examined는 PS3.16 Annex L의 Defined Terms에 있는 값만 출력하도록 강화했습니다(`test_upper_case_name_in_coded_attribute_is_suppressed`).
+- pydicom의 값 검증 경고가 원래 값을 인용해(`Invalid value for VR UI: '<값>'`) 로그에 PHI가 남을 수 있었습니다. pydicom 검증을 끄고 Layer 1이 값 없이 형식을 검사합니다(`test_reading_malformed_values_does_not_log_them`).
+- finding(규칙 검사 결과)도 값 없이 코드·표준 키워드·건수·출처만 담습니다. LLM에는 finding 코드와 건수만 갑니다.
+- 이 수정은 **출력 경계**만 다룹니다. 파일 자체가 비식별화 기준을 만족하는지는 Layer 2(PS3.15 Annex E) 검사의 몫입니다([docs/dicom-rules.md](../dicom-rules.md)).

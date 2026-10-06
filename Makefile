@@ -10,7 +10,8 @@ EVAL_DATABASE_URL ?= postgresql+asyncpg://clinical:clinical@localhost:5432/clini
 EVAL_OLLAMA_URL   ?= http://localhost:11434
 
 .PHONY: help setup samples seed lint format test test-unit test-integration \
-        up down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline
+        up down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline \
+        dicom-scan dicom-rules
 
 help:  ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-18s %s\n",$$1,$$2}'
@@ -26,6 +27,13 @@ seed:  ## copy sample docs (incl. .corpus.yaml marker) and DICOM into data/raw-d
 	mkdir -p data/raw-docs/documents data/raw-docs/dicom
 	cp -R samples/documents/. data/raw-docs/documents/
 	cp -R samples/dicom/. data/raw-docs/dicom/
+
+dicom-scan:  ## Layer 1/2 DICOM check over a folder: make dicom-scan DIR=path [SCAN_ARGS="--json out.jsonl"]
+	$(UV) python -m app.cli.dicom_scan $(or $(DIR),samples/dicom) $(SCAN_ARGS)
+
+dicom-rules:  ## regenerate rules/standard/*.yaml from the DICOM standard (network: dicom.nema.org)
+	$(UV) python scripts/build_iod_rules.py
+	$(UV) python scripts/build_deid_rules.py
 
 lint:  ## ruff check + format check
 	$(RUFF) check --config backend/pyproject.toml backend tests eval scripts frontend

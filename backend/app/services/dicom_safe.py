@@ -3,11 +3,14 @@
 Only attributes listed here may have their *value* leave the analyzer (API response, DB row,
 LLM prompt). Each allowlisted value must additionally pass a format check for its kind, so a
 free-text string smuggled into a coded attribute (e.g. a name typed into BodyPartExamined) is
-suppressed too. Every other attribute is reported as presence only: "exists" / "empty" / "absent".
+suppressed too. Coded values can further be restricted to the standard's Defined Terms
+(Modality: PS3.3 C.7.3.1.1.1, Body Part Examined: PS3.16 Annex L), which also catches an
+upper-case name typed into a CS attribute. Every other attribute is reported as presence only:
+"exists" / "empty" / "absent".
 """
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pydicom.dataset import Dataset
@@ -28,6 +31,10 @@ SAFE_VALUE_ATTRIBUTES: dict[str, str] = {
     "Modality": "cs",
     "BodyPartExamined": "cs",
     "SOPClassUID": "sop_class",
+    "PatientIdentityRemoved": "cs",
+    "BurnedInAnnotation": "cs",
+    "Units": "cs",
+    "DecayCorrection": "cs",
     "Rows": "number",
     "Columns": "number",
     "NumberOfFrames": "number",
@@ -96,8 +103,24 @@ def _safe(kind: str, value: Any) -> Any:
     return None
 
 
-def safe_value(ds: Dataset, keyword: str) -> Any:
-    """The output-safe representation of one attribute."""
+# Coded attributes whose value is only shown when it is one of the listed terms.
+ENUMERATED: dict[str, frozenset[str]] = {
+    "PatientIdentityRemoved": frozenset({"YES", "NO"}),
+    "BurnedInAnnotation": frozenset({"YES", "NO"}),
+    "DecayCorrection": frozenset({"NONE", "START", "ADMIN"}),
+    "Units": frozenset(
+        {"CNTS", "NONE", "CM2", "CM2ML", "PCNT", "CPS", "BQML", "MGMINML", "UMOLMINML"}
+        | {"MLMING", "MLG", "1CM", "UMOLML", "PROPCNTS", "PROPCPS", "MLMINML", "MLML"}
+        | {"GML", "STDDEV"}
+    ),  # PS3.3 C.8.9.1.1.3 Units Defined Terms
+}
+
+
+def safe_value(ds: Dataset, keyword: str, terms: Mapping[str, frozenset[str]] | None = None) -> Any:
+    """The output-safe representation of one attribute.
+
+    `terms` optionally restricts coded attributes to a set of Defined Terms.
+    """
     state = presence(ds, keyword)
     kind = SAFE_VALUE_ATTRIBUTES.get(keyword)
     if state != EXISTS or kind is None:
@@ -106,8 +129,13 @@ def safe_value(ds: Dataset, keyword: str) -> Any:
         rendered = _safe(kind, ds.data_element(keyword).value)
     except (ValueError, TypeError, OverflowError):  # malformed DS/IS etc.
         rendered = None
+    allowed = (terms or {}).get(keyword) or ENUMERATED.get(keyword)
+    if kind == "cs" and allowed is not None and rendered not in allowed:
+        rendered = None
     return SUPPRESSED if rendered is None else rendered
 
 
-def safe_summary(ds: Dataset, keywords: Iterable[str]) -> dict[str, Any]:
-    return {keyword: safe_value(ds, keyword) for keyword in keywords}
+def safe_summary(
+    ds: Dataset, keywords: Iterable[str], terms: Mapping[str, frozenset[str]] | None = None
+) -> dict[str, Any]:
+    return {keyword: safe_value(ds, keyword, terms) for keyword in keywords}

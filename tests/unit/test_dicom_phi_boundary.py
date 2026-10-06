@@ -159,3 +159,35 @@ async def test_api_response_db_row_and_prompts_carry_no_phi(
     rows = [o for o in factory.added if isinstance(o, DicomFile)]
     assert rows
     assert_no_phi(json.dumps([r.tags for r in rows], ensure_ascii=False, default=str))
+
+
+def test_upper_case_name_in_coded_attribute_is_suppressed(settings: Settings, tmp_path) -> None:
+    """CS-shaped free text (passes the CS charset) is caught by the Defined Terms check."""
+    path = tmp_path / "bodypart.dcm"
+    build_dataset("CT", {"BodyPartExamined": "HONG GILDONG"}).save_as(
+        path, enforce_file_format=True
+    )
+    result = evaluate(read_dataset(path), load_rules(settings.rules_path))
+    assert result["tag_summary"]["BodyPartExamined"] == SUPPRESSED
+    assert "HONG GILDONG" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_reading_malformed_values_does_not_log_them(settings: Settings, tmp_path, caplog) -> None:
+    import warnings
+
+    from generate_sample_dicom import build_malformed
+
+    path = tmp_path / "bad.dcm"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ds = build_malformed()
+        ds.PatientName = "HONG^GILDONG"
+        ds.PatientID = "x" * 80  # over-long LO
+        ds.save_as(path, enforce_file_format=True)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = evaluate(read_dataset(path), load_rules(settings.rules_path))
+    emitted = " ".join(str(w.message) for w in caught) + caplog.text
+    for value in ("1.2.840.01.5", "2026-01-01", "HONG^GILDONG", "x" * 80):
+        assert value not in emitted
+    assert result["counts"]["layer1"]["error"] >= 4  # still detected by Layer 1

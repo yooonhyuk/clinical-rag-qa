@@ -1,5 +1,6 @@
 """HTTP API tests (httpx AsyncClient + ASGI). DB, Ollama and Claude are faked."""
 
+import shutil
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from app.container import build_container
 from app.main import create_app
 from app.models import DicomFile
 from app.services.llm_types import GroundedAnswer
+from tests.conftest import SAMPLES as SAMPLES_DIR
 from tests.fakes import FakeOllama, FakeSessionFactory, make_chunk
 
 
@@ -109,9 +111,19 @@ async def test_dicom_analyze_returns_rule_results_and_persists(
     assert "PatientName exists" in body["privacyWarnings"]
     assert body["missingRequiredTags"] == []
     assert "영상 판독은 수행하지 않습니다" in body["summary"]
-    assert body["ruleSource"] == "rules/required_tags.yaml, rules/privacy_tags.yaml"
+    assert "PS3.15 2026d" in body["ruleSource"] and "PS3.3 2026d" in body["ruleSource"]
+    assert body["layer1"]["iod"]["name"] == "CT Image IOD"
+    assert body["layer1"]["iod"]["determinedBy"] == "SOPClassUID"
+    assert body["layer2"]["profileEdition"] == "PS3.15 2026d"
+    assert body["layer2"]["claimedDeid"]["patientIdentityRemoved"] == "absent"
+    assert set(body["counts"]) == {"layer1", "layer2", "quantitationReadiness"}
+    assert body["quantitationReadiness"]["applicable"] is False
+    finding = next(f for f in body["layer2"]["findings"] if f["code"] == "DEID-X-PRESENT")
+    assert finding["source"] == "PS3.15 2026d Table E.1-1" and finding["action"] == "X"
+    assert "DEMO CT CHEST" not in res.text  # free text never leaves the analyzer
     saved = [o for o in factory.added if isinstance(o, DicomFile)]
     assert saved and saved[0].status == "ANALYZED"
+    assert saved[0].tags["layer2"]["profileEdition"] == "PS3.15 2026d"
 
 
 async def test_dicom_analyze_rejects_paths_outside_allowed_roots(settings, factory) -> None:
@@ -185,3 +197,18 @@ def test_grounded_answer_schema_matches_model() -> None:
     from app.services.llm_types import GROUNDED_ANSWER_SCHEMA
 
     assert set(GROUNDED_ANSWER_SCHEMA["properties"]) == set(GroundedAnswer.model_fields)
+
+
+@pytest.mark.parametrize(
+    "name", sorted(p.name for p in (SAMPLES_DIR / "dicom").glob("*.dcm")), ids=str
+)
+async def test_dicom_analyze_validates_for_every_sample(settings, factory, name) -> None:
+    shutil.copy(SAMPLES_DIR / "dicom" / name, settings.dicom_path / name)
+    client, _ = _client(settings, factory)
+    async with client:
+        res = await client.post("/api/dicom/analyze", json={"filePath": name, "explain": False})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["layer1"]["iod"]["name"]
+    for finding in body["layer1"]["findings"] + body["layer2"]["findings"]:
+        assert finding["source"]
