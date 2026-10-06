@@ -58,7 +58,7 @@ backend/app/
   cli/        dicom_scan.py (폴더 일괄 검사)
 backend/alembic/versions/  0001_initial_schema · 0002_ask_log_llm_usage · 0003_pg_trgm
                            0004_embedding_model_tracking
-frontend/streamlit_app.py
+frontend/streamlit_app.py · no_egress_entrypoint.py (폐쇄망 ui: default route 제거 후 권한 하강)
 eval/       questions.yaml (25문항) · eval_metrics.py · run_eval.py · reports/
 tests/      unit/ (API 테스트 포함) · integration/ (PostgreSQL + pgvector)
 offline-bundle/  build-bundle.sh · install.sh · verify-offline.sh
@@ -66,8 +66,10 @@ samples/    documents/ (가상 문서 6종 + .corpus.yaml) · dicom/ (합성 DIC
 scripts/    generate_sample_dicom.py · generate_sample_pdf.py
             build_iod_rules.py · build_deid_rules.py · dicom_docbook.py (표준 → 규칙 YAML)
             diagnose_embedding.py (토크나이저/cosine 진단) · reset_embeddings.py
+            export_ollama_models.py (번들용: 로컬 Ollama 저장소에서 모델 복사)
 docs/       dicom-rules.md (DICOM 2계층 규칙 설계·출처·한계)
 docs/issues/  001-korean-embedding-unk.md · 002-dicom-free-text-phi-to-llm.md
+              003-offline-ui-egress.md · 004-compose-host-ollama-and-port-binding.md
 ```
 
 ---
@@ -87,43 +89,84 @@ make lint
 ```bash
 cp .env.example .env
 make seed                 # samples → data/raw-docs (가상 문서, .corpus.yaml 표식 포함)
-make up                   # api(8000), ui(8501), db(5432), ollama(11434)
+make up                   # api(8000), ui(8501), db(5432), ollama(11434) — 모두 127.0.0.1에만 공개
 make pull-models          # gemma4:e4b + bge-m3 (LLM_MODEL=... / EMBEDDING_MODEL=... 로 변경)
 make index                # POST /api/index
 open http://localhost:8501
 ```
 
+호스트에 이미 Ollama와 모델이 있으면 ollama 컨테이너 없이 띄울 수 있습니다(모델을 다시 받지 않음).
+
+```bash
+make seed
+make up-host-ollama       # docker-compose.host-ollama.yml: api → host.docker.internal:11434
+make index
+```
+
 - API 문서는 `http://localhost:8000/docs`, 상태 확인은 `GET /api/health`입니다(DB, pgvector, Ollama, 모델 존재 여부, embedding 인덱스의 차원·모델 일치 여부).
-- Mac에서는 Docker 안의 Ollama가 GPU(Metal)를 쓰지 못해 느립니다. 개발할 때는 호스트 Ollama를 쓰는 편이 낫습니다(`.env`의 `OLLAMA_BASE_URL=http://host.docker.internal:11434`).
+- Mac에서는 Docker 안의 Ollama가 GPU(Metal)를 쓰지 못해 느립니다. 개발할 때는 호스트 Ollama를 쓰는 편이 낫습니다(`make up-host-ollama`, 또는 `.env`의 `OLLAMA_BASE_URL`).
+- api 컨테이너는 시작할 때 `alembic upgrade head`를 실행합니다.
 
 ### 3) 오프라인(폐쇄망) 번들
 
-인터넷이 되는 장비에서 번들을 만듭니다.
+Docker가 있는 장비에서 번들을 만듭니다.
 
 ```bash
 make bundle    # = offline-bundle/build-bundle.sh
-# → offline-bundle/out/clinical-rag-qa-offline-0.1.0.tar.gz
-#    images/  (docker save: api, ui, pgvector, ollama)
-#    models/  (Ollama 모델 저장소 tarball: gemma4:e4b + bge-m3, 약 11GB)
-#    wheels/  (개발/테스트용 Python wheel + requirements.txt)
-#    samples/, docker-compose*.yml, install.sh, verify-offline.sh, SHA256SUMS
+# → offline-bundle/out/clinical-rag-qa-offline-0.1.0.tar (git에는 넣지 않음)
+#    images/  (docker save + gzip: api, ui, pgvector, ollama)
+#    models/  (ollama-models.tar: LLM + embedding 모델의 manifest·blob만)
+#    wheels/  (선택: 개발/테스트용 Python wheel + requirements.txt)
+#    samples/, docker-compose*.yml, install.sh, verify-offline.sh, .env.example, SHA256SUMS
 ```
 
-`PLATFORM`(기본 `linux/amd64`)과 `WHEEL_PLATFORM`으로 설치 대상 아키텍처를 고릅니다.
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `PLATFORM` | `linux/amd64` | 설치 대상 아키텍처. 같은 아키텍처의 base 이미지가 로컬에 있으면 pull하지 않음 |
+| `LLM_MODEL` / `EMBEDDING_MODEL` | `gemma4:e4b` / `bge-m3` | 번들에 넣을 모델. 번들의 `.env.example`도 이 값으로 바뀜 |
+| `OLLAMA_MODELS_DIR` | `~/.ollama/models` | 모델을 복사할 로컬 Ollama 저장소 |
+| `MODELS_PULL` | `0` | `1`이면 로컬에 없는 모델을 임시 컨테이너에서 pull(인터넷 필요) |
+| `WHEELS` / `WHEEL_PLATFORM` | `1` / `manylinux_2_28_x86_64` | `0`이면 wheel 다운로드 생략 |
+
+모델 가중치(GGUF)는 거의 압축되지 않아 모델과 바깥 묶음은 압축하지 않은 tar로 만듭니다. 크기는 다음과 같습니다(arm64, 2026-10-06).
+
+| 구성 | 크기 |
+|---|---|
+| api 이미지 (gzip) | 179MB |
+| ui 이미지 (gzip) | 292MB |
+| pgvector 이미지 (gzip) | 161MB |
+| ollama 이미지 (gzip) | 3.0GB |
+| 모델: medgemma:4b + bge-m3 | 4.5GB |
+| 모델: gemma4:e4b + bge-m3 (기본값) | 약 10.8GB |
+| 번들 합계 (medgemma:4b 기준) | 7.8GB |
 
 폐쇄망 장비에서는 다음과 같이 설치합니다.
 
 ```bash
-tar xzf clinical-rag-qa-offline-0.1.0.tar.gz && cd clinical-rag-qa-offline-0.1.0
+tar xf clinical-rag-qa-offline-0.1.0.tar && cd clinical-rag-qa-offline-0.1.0
 ./install.sh          # 체크섬 검증 → docker load → 모델 복원 → compose up(internal) → alembic → health
-./verify-offline.sh   # api 컨테이너에서 pypi/anthropic/ollama registry 접속이 막혔는지, ollama 내부 통신은 되는지 확인
+./verify-offline.sh   # 47개 항목: 토폴로지·라우트·egress·ui 권한·내부 통신·앱 응답. 하나라도 실패하면 exit 1
 ```
+
+`verify-offline.sh`가 확인하는 항목은 다음과 같습니다([이슈 003](docs/issues/003-offline-ui-egress.md)).
+
+1. db·ollama·api는 internal 네트워크에만 연결되어 있고 포트를 공개하지 않는다. ui는 127.0.0.1:8501에만 공개한다.
+2. 모든 컨테이너(ui 포함)에 IPv4 default route가 없다.
+3. 모든 컨테이너에서 1.1.1.1, 8.8.8.8, pypi.org, registry.ollama.ai, api.anthropic.com, host.docker.internal 접속이 실패한다.
+4. Streamlit이 uid 10001, capability 0으로 실행되고, 호스트에서 127.0.0.1:8501에 접속된다.
+5. api→db, api→ollama, ui→api 내부 통신이 된다.
+6. ui 컨테이너에서 api를 통해 샘플 인덱싱, 한국어 질문 답변(출처 포함), 범위 밖 질문 거절, DICOM 분석이 된다.
+
+**실행 결과 (2026-10-06, Docker Desktop 29.5.2, macOS arm64)**: `PLATFORM=linux/arm64 WHEELS=0 LLM_MODEL=medgemma:4b make bundle`로 만든 번들을 다른 폴더에 풀어 `install.sh`(약 1분) → `verify-offline.sh` 순서로 실행했고, 47개 항목 모두 PASS였습니다. 질문 답변은 CPU의 medgemma:4b로 생성에 약 26초가 걸렸습니다. Docker Desktop VM 메모리가 7.7GB라 기본 LLM인 gemma4:e4b(9.6GB)는 컨테이너에 올릴 수 없어 medgemma:4b로 대신 검증했습니다. 이전 ui 설정으로 되돌려 실행하면 ui의 route·egress 7개 항목이 FAIL입니다(음성 대조).
 
 `docker-compose.offline.yml`의 설정은 다음과 같습니다.
 
 - db·ollama·api는 `internal: true` 네트워크에만 연결합니다. 외부로 나가는 경로가 없고 호스트 포트도 열지 않습니다.
 - 외부 LLM Provider를 강제로 끕니다(`LLM_PROVIDER=ollama`, `ALLOW_EXTERNAL_LLM=false`).
 - `pull_policy: never`로 설정해 이미지를 받거나 빌드하지 않습니다.
+- ui는 호스트 포트(127.0.0.1:8501)를 열기 위해 일반 bridge `ui_edge`에도 연결합니다. Docker는 internal 네트워크에서 포트를 공개하지 못하고, `enable_ip_masquerade=false`도 Docker Desktop에서는 외부 접속을 막지 못했습니다. 그래서 ui의 entrypoint(`frontend/no_egress_entrypoint.py`)가 root(NET_ADMIN)로 default route를 지운 뒤 uid 10001로 내려가 capability를 모두 버리고 Streamlit을 실행합니다. 외부 DNS는 `dns: [127.0.0.1]`로 막습니다.
+- CPU 전용 장비를 고려해 Ollama 타임아웃 기본값을 300초로 둡니다(`OFFLINE_OLLAMA_TIMEOUT_SEC`).
+- `CRQA_VOLUME_PREFIX`(기본 `crqa`)로 데이터 볼륨 이름을 바꿀 수 있습니다. 기존 데이터를 건드리지 않고 시험 설치할 때 씁니다.
 
 ### 4) 평가 (`make eval`)
 
@@ -222,7 +265,7 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 
 | 구분 | 내용 | 도구 |
 |---|---|---|
-| 단위 | embedding 모델별 차원·prefix 해석과 잘못된 차원 거부, health의 embedding 인덱스 판정, 텍스트 추출(MD 헤딩, CP949, PDF 페이지, 암호화/손상/스캔 PDF), chunker, 폴더 스캔, DICOM Layer 1(IOD 11종 결정, Type 1/2, Functional Group, UI/DA/TM, Defined Terms, PET SUV)·Layer 2(E.1-1 조치·조합 해석, 중첩 sequence, private, 선언·가명·픽셀 위험·날짜 옵션)·PHI 비노출(응답·DB·프롬프트·로그), 규칙 생성기 파서, 폴더 스캔 CLI, Ollama 재시도(respx), Semaphore 상한, 거절 정책, Anthropic SDK 오류 매핑, 가드레일, Provider 간 응답 동일성, 평가 지표 | pytest, respx, AsyncMock |
+| 단위 | embedding 모델별 차원·prefix 해석과 잘못된 차원 거부, health의 embedding 인덱스 판정, 텍스트 추출(MD 헤딩, CP949, PDF 페이지, 암호화/손상/스캔 PDF), chunker, 폴더 스캔, DICOM Layer 1(IOD 11종 결정, Type 1/2, Functional Group, UI/DA/TM, Defined Terms, PET SUV)·Layer 2(E.1-1 조치·조합 해석, 중첩 sequence, private, 선언·가명·픽셀 위험·날짜 옵션)·PHI 비노출(응답·DB·프롬프트·로그), 규칙 생성기 파서, 폴더 스캔 CLI, Ollama 재시도(respx), Semaphore 상한, 거절 정책, Anthropic SDK 오류 매핑, 가드레일, Provider 간 응답 동일성, 평가 지표, 오프라인 번들(모델 export, ui default route 제거·권한 하강 순서, compose 포트·네트워크 하드닝) | pytest, respx, AsyncMock |
 | API | `/api/ask`, `/api/retrieve`, `/api/index`, `/api/dicom/analyze`, `/api/health`, 경로 탈출 차단(403), LLM 장애 시 503 | httpx `ASGITransport` |
 | 통합 | 인덱싱 파이프라인 → pgvector 저장 → 검색, 중복/실패/롤백, API로 인덱싱 후 질문하고 `ask_logs` 확인, embedding이 무너져도 pg_trgm 채널이 한국어 질문의 정답 chunk를 1위로 올리는지, 다른 embedding 모델의 chunk 제외·health 불일치 보고·자동 재embedding, 0004 마이그레이션의 차원 변경(768↔1024)·벡터 삭제·HNSW 재생성·REINDEX_REQUIRED | 실제 PostgreSQL 16 + pgvector |
 
@@ -231,7 +274,8 @@ Ollama와 Claude는 모든 테스트에서 가짜 클라이언트로 대체합�
 
 **실행 결과 (2026-10-06, macOS arm64, Docker 실행 중)**
 
-- `make test`: **188 passed, 0 skipped** (단위·API 182 + 통합 6). 통합 테스트는 testcontainers(`pgvector/pgvector:pg16`) 경로로 실행했습니다.
+- `make test`: **198 passed, 0 skipped** (단위·API 192 + 통합 6). 통합 테스트는 testcontainers(`pgvector/pgvector:pg16`) 경로로 실행했습니다.
+- 오프라인 번들 단위 테스트(#4, #5) 추가 전: 188 passed (단위·API 182 + 통합 6).
 - DICOM 규칙 재구성(#2, #3) 전: 107 passed (단위·API 101 + 통합 6).
 - bge-m3 전환 전: 91 passed (단위·API 87 + 통합 4).
 - 이전 기록(2026-10-05): Docker가 꺼져 있어 85 passed, 3 skipped. 그때 통합 3건은 `TEST_DATABASE_URL`(로컬 `pgserver`)로 따로 3 passed를 확인했습니다.
@@ -291,8 +335,8 @@ HYBRID_SEARCH=true  make eval
   - Ollama는 bge-m3의 dense 벡터만 제공합니다(sparse·multi-vector 미사용).
   - 모델을 바꿀 때마다 전체 재인덱싱이 필요하고, 무중단 전환은 구현하지 않았습니다.
   - 주제는 같지만 답이 없는 질문(q25)은 cosine으로 거를 수 없어 모델 거절에 의존합니다.
-- **미실행 항목**: RAG 평가는 호스트에서 `db` 컨테이너와 호스트 Ollama로 실행했습니다. api/ui 이미지 빌드, 전체 `docker compose up`, 오프라인 번들 생성·설치, `verify-offline.sh`는 아직 실행하지 않았습니다.
-- **폐쇄망 UI 포트**: Docker는 internal 네트워크에서 호스트 포트를 열지 못합니다. 그래서 ui만 `ui_edge` 브리지 네트워크에 추가로 연결했고, 이 때문에 ui 컨테이너는 이론상 외부로 나갈 수 있습니다(api·db·ollama는 불가). 완전히 차단하려면 호스트 방화벽이나 리버스 프록시를 함께 써야 합니다.
+- **실행 범위**: 전체 `docker compose build/up`(호스트 Ollama 사용), 오프라인 번들 생성·설치·`verify-offline.sh`는 macOS arm64(Docker Desktop)에서만 실행했습니다. linux/amd64 번들과 Linux 엔진에서는 아직 돌려보지 않았습니다. 폐쇄망 검증은 VM 메모리 때문에 gemma4:e4b 대신 medgemma:4b로 했습니다(gemma4:e4b는 컨테이너 메모리 약 12GB 이상 필요). RAG 평가 수치는 호스트 Ollama 기준입니다.
+- **폐쇄망 UI 포트**: ui는 `ui_edge`에 연결되지만 default route를 지워 외부로 나갈 수 없습니다([이슈 003](docs/issues/003-offline-ui-egress.md)). 남은 한계는 다음과 같습니다. 호스트 관리자가 `docker exec -u 0`으로 들어가면 route를 다시 추가할 수 있고, ui는 `ui_edge` 서브넷(bridge gateway = Docker 호스트)에는 닿습니다. IPv6는 다루지 않습니다(compose 기본값은 꺼짐).
 - **OUT_OF_SCOPE 판별**은 정규식 휴리스틱이라 표현이 바뀌면 놓치거나 잘못 거절할 수 있습니다. 그래서 2·3단계 거절과 시스템 프롬프트로 한 번 더 막습니다.
 - **chunking**은 고정 크기(문자 수 기준)입니다. 표·목록 구조를 따로 처리하지 않습니다. 토큰 기준이나 표를 인식하는 chunking은 이후 버전에서 다룹니다.
 - `/api/index`는 동기 실행입니다(요청이 인덱싱 완료까지 대기). 목표인 100개 이하 문서에서는 문제없지만, 규모가 커지면 작업 큐(arq 등)가 필요합니다.

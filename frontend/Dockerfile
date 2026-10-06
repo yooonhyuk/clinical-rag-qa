@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --only-group ui --no-install-project
-COPY frontend/streamlit_app.py ./
+COPY frontend/streamlit_app.py frontend/no_egress_entrypoint.py ./
 
 RUN useradd --create-home --uid 10001 app
 USER app

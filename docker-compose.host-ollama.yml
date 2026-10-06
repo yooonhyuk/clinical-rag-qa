@@ -1,0 +1,16 @@
+# Use the Ollama running on the host instead of the ollama container (development on macOS,
+# where Ollama inside Docker cannot use the GPU):
+#   docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml up -d --build
+# The host's models are used as-is; nothing is pulled.
+services:
+  ollama:
+    profiles: [container-ollama]   # not started unless that profile is enabled
+
+  api:
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux; Docker Desktop resolves it already
+    depends_on: !override
+      db:
+        condition: service_healthy

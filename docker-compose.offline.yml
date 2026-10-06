@@ -2,9 +2,16 @@
 #   docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d
 #
 # - db / ollama / api are attached ONLY to an `internal: true` network: no route to the
-#   internet, and no published host ports.
-# - ui additionally joins `ui_edge` because Docker cannot publish a host port from an
-#   internal-only network. The UI only talks to the api; see README "제한 사항".
+#   internet or the host, and no published host ports.
+# - ui also needs a published port (127.0.0.1:8501), which Docker cannot do from an internal
+#   network, so it joins `ui_edge` as well. To keep the ui without egress anyway:
+#     * its entrypoint (frontend/no_egress_entrypoint.py) deletes the default route as root,
+#       then drops to uid 10001, which clears all capabilities (it cannot re-add a route);
+#     * `dns: [127.0.0.1]` makes Docker's embedded DNS forward external names to nowhere
+#       (service names such as `api` still resolve);
+#     * cap_drop ALL except what the entrypoint needs, no-new-privileges.
+#   Published-port traffic arrives from the ui_edge bridge gateway, which stays reachable as a
+#   directly connected subnet. verify-offline.sh proves both sides (no egress, port works).
 # - images must already be loaded (`docker load`); nothing is pulled or built.
 # - the external LLM provider is forced off.
 
@@ -25,6 +32,8 @@ services:
     networks: [internal_only]
     ports: !reset []
     environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_TIMEOUT_SEC: ${OFFLINE_OLLAMA_TIMEOUT_SEC:-300}   # CPU-only targets are slow
       LLM_PROVIDER: ollama
       ALLOW_EXTERNAL_LLM: "false"
       ANTHROPIC_API_KEY: ""
@@ -33,8 +42,21 @@ services:
     pull_policy: never
     build: !reset null
     networks: [internal_only, ui_edge]
+    ports: !override
+      - "127.0.0.1:8501:8501"
+    user: "0:0"   # only for the entrypoint; it switches to uid 10001 before starting Streamlit
+    entrypoint: ["python", "/app/no_egress_entrypoint.py"]
+    command: ["streamlit", "run", "streamlit_app.py", "--server.address=0.0.0.0",
+              "--server.port=8501", "--server.headless=true"]
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    dns: [127.0.0.1]
 
 networks:
   internal_only:
     internal: true
-  ui_edge: {}
+  ui_edge:
+    driver_opts:
+      # Blocks NAT on Linux engines; Docker Desktop NATs regardless, hence the route removal.
+      com.docker.network.bridge.enable_ip_masquerade: "false"

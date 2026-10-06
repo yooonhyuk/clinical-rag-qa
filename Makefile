@@ -2,6 +2,7 @@
 UV      := uv run --project backend
 RUFF    := $(UV) ruff
 COMPOSE := docker compose
+HOST_OLLAMA := docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml
 OFFLINE := docker compose -f docker-compose.yml -f docker-compose.offline.yml
 LLM_MODEL       ?= gemma4:e4b
 EMBEDDING_MODEL ?= bge-m3
@@ -10,7 +11,7 @@ EVAL_DATABASE_URL ?= postgresql+asyncpg://clinical:clinical@localhost:5432/clini
 EVAL_OLLAMA_URL   ?= http://localhost:11434
 
 .PHONY: help setup samples seed lint format test test-unit test-integration \
-        up down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline \
+        up up-host-ollama down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline \
         dicom-scan dicom-rules
 
 help:  ## list targets
@@ -55,8 +56,12 @@ test-integration:  ## PostgreSQL+pgvector tests (testcontainers or TEST_DATABASE
 up:  ## build and start api, ui, db, ollama
 	$(COMPOSE) up -d --build
 
-down:  ## stop the stack
-	$(COMPOSE) down
+up-host-ollama:  ## build and start api, ui, db using the host's Ollama (no ollama container, no pulls)
+	$(HOST_OLLAMA) up -d --build --wait
+
+down:  ## stop the stack (online, host-ollama or offline; volumes are kept)
+	$(COMPOSE) down --remove-orphans
+	$(OFFLINE) down --remove-orphans
 
 logs:
 	$(COMPOSE) logs -f api
@@ -84,11 +89,11 @@ api:  ## run the API locally (hot reload)
 ui:  ## run the Streamlit UI locally
 	uv run --project backend --group ui streamlit run frontend/streamlit_app.py
 
-bundle:  ## build the offline bundle (needs internet + Docker)
+bundle:  ## build the offline bundle from local images/models (PLATFORM, LLM_MODEL, WHEELS=0)
 	./offline-bundle/build-bundle.sh
 
-offline-up:  ## start with the internal-only network override
-	$(OFFLINE) up -d
+offline-up:  ## start with the internal-only network override (images must exist locally)
+	$(OFFLINE) up -d --wait
 
-verify-offline:  ## prove that api/ollama have no egress in offline mode
+verify-offline:  ## prove no container has egress in offline mode and the app still answers
 	./offline-bundle/verify-offline.sh

@@ -1,17 +1,20 @@
 # Local-first stack: api (FastAPI) + ui (Streamlit) + db (PostgreSQL 16 + pgvector) + ollama.
 # Online use:  docker compose up -d --build && make pull-models
+# Host Ollama: make up-host-ollama (adds docker-compose.host-ollama.yml; no ollama container)
 # Offline use: see offline-bundle/install.sh (adds docker-compose.offline.yml).
+# Published ports bind to 127.0.0.1 only; nothing listens on the LAN.
 name: clinical-rag-qa
 
 x-app-env: &app-env
   DATABASE_URL: postgresql+asyncpg://clinical:clinical@db:5432/clinical_rag_qa
-  OLLAMA_BASE_URL: http://ollama:11434
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
   OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-gemma4:e4b}
   # Multilingual default (see docs/issues/001-korean-embedding-unk.md). Changing the model to one
   # with another dimension needs `make reset-embeddings` + reindex. Empty EMBEDDING_DIM = the
   # known dimension of the model (bge-m3 1024, nomic-embed-text 768).
   OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
   EMBEDDING_DIM: ${EMBEDDING_DIM:-}
+  OLLAMA_TIMEOUT_SEC: ${OLLAMA_TIMEOUT_SEC:-60}
   # Default is local generation. The Claude API provider is opt-in and guarded
   # (ALLOW_EXTERNAL_LLM=true + marked sample corpus + ANTHROPIC_API_KEY from the environment).
   LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
@@ -29,7 +32,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U clinical -d clinical_rag_qa"]
       interval: 5s
@@ -41,7 +44,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -58,7 +61,7 @@ services:
     volumes:
       - ./data:/app/data
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -72,14 +75,20 @@ services:
       dockerfile: frontend/Dockerfile
     environment:
       API_BASE_URL: http://api:8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     depends_on:
       api:
         condition: service_healthy
 
+# CRQA_VOLUME_PREFIX lets a second stack (e.g. a bundle test) run without touching crqa_* data.
 volumes:
   pgdata:
-    name: crqa_pgdata
+    name: ${CRQA_VOLUME_PREFIX:-crqa}_pgdata
   ollama_data:
-    name: crqa_ollama_data
+    name: ${CRQA_VOLUME_PREFIX:-crqa}_ollama_data
