@@ -31,6 +31,7 @@ class _Table:
         self.header: list[list[str]] = []
         self.body: list[list[str]] = []
         self.row: list[str] | None = None
+        self.row_all_th = True
         self.cell: list[str] | None = None
         self.colspan = 1
         self.in_head = False
@@ -96,8 +97,10 @@ class _Parser(HTMLParser):
                 table.in_head = False
             elif tag == "tr":
                 table.row = []
+                table.row_all_th = True
             elif tag in {"td", "th"} and table.row is not None:
                 table.cell = []
+                table.row_all_th = table.row_all_th and tag == "th"
                 table.colspan = max(1, int(attr.get("colspan") or 1))
             elif tag in _BLOCK and table.cell is not None:
                 table.cell.append(" ")
@@ -141,7 +144,9 @@ class _Parser(HTMLParser):
                 table.row.extend([" ".join("".join(table.cell).split())] * table.colspan)
                 table.cell = None
             elif tag == "tr" and table.row is not None:
-                (table.header if table.in_head else table.body).append(table.row)
+                # <thead> rows, or leading rows made only of <th> cells, are the header
+                leading_th = table.row_all_th and not table.body
+                (table.header if table.in_head or leading_th else table.body).append(table.row)
                 table.row = None
             elif tag == "table":
                 self._end_table(self.tables.pop())

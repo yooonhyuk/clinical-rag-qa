@@ -193,3 +193,32 @@ def test_public_corpus_documents_extract_with_sections(
     if file_type == "pdf":
         assert all(c.page_number is not None for c in chunks)
         assert not any("Contains Nonbinding Recommendations" in c.text for c in chunks)
+
+
+def test_table_without_header_is_not_given_a_guessed_one(tmp_path: Path) -> None:
+    html = (
+        "<html><body><h1>E.1</h1><p class='title'>Table E.1-1a. Action Codes</p>"
+        "<table><tbody><tr><td>D</td><td>replace with a dummy value</td></tr>"
+        "<tr><td>Z</td><td>replace with a zero length value</td></tr></tbody></table>"
+        "</body></html>"
+    )
+    path = tmp_path / "codes.html"
+    path.write_text(html, encoding="utf-8")
+    table = next(s for s in extract(path, "html") if "Table E.1-1a" in (s.section_title or ""))
+    assert table.text.splitlines()[1:] == [
+        "D | replace with a dummy value",
+        "Z | replace with a zero length value",
+    ]
+    assert rows_to_lines([], [["a", "b"]]) == ["a | b"]
+
+
+def test_jats_paragraph_with_nested_list_keeps_its_lead_in(tmp_path: Path) -> None:
+    xml = (
+        "<article><body><sec><title>Statistical Analysis</title><p>Two groups were defined:"
+        "<list><list-item><p>RECIL-1: response</p></list-item></list> and tested.</p>"
+        "</sec></body></article>"
+    )
+    path = tmp_path / "n.xml"
+    path.write_text(xml, encoding="utf-8")
+    lines = extract(path, "xml")[0].text.splitlines()
+    assert lines == ["Two groups were defined:", "RECIL-1: response", "and tested."]

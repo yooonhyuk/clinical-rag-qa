@@ -11,15 +11,15 @@ def rows_to_lines(header_rows: list[list[str]], body_rows: list[list[str]]) -> l
     A wide table (e.g. DICOM PS3.15 Table E.1-1, 15 columns) then yields short lines that still
     say which column each value belongs to, so a single row survives chunking on its own.
     Several header rows (a spanning group row + column names) are merged column-wise. Without
-    a header (no <thead>), the first row is used. A body row whose width differs from the
-    header falls back to "v1 | v2 | ...".
+    a header (no <thead>, no all-<th> first row) rows are rendered as "v1 | v2 | ...": guessing
+    a header from the first data row mislabels every value (DICOM Table E.1-1a is a two-column
+    code | meaning table without one). A body row whose width differs from the header falls
+    back to the same form.
     """
     header_rows = [_clean(r) for r in header_rows if any(c.strip() for c in r)]
     body_rows = [_clean(r) for r in body_rows if any(c.strip() for c in r)]
-    if not header_rows and body_rows:
-        header_rows, body_rows = [body_rows[0]], body_rows[1:]
     if not header_rows:
-        return []
+        return [" | ".join(c for c in row if c) for row in body_rows]
     width = max(len(r) for r in header_rows)
     header = [""] * width
     for row in header_rows:

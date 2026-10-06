@@ -37,6 +37,7 @@ _SKIP_SEC_TITLES = {
     "footnotes",
     "references",
 }
+_NESTED_BLOCKS = {"list", "table-wrap", "disp-quote", "fig", "boxed-text", "def-list"}
 _BLOCK_TAGS = {"p", "list-item", "disp-quote", "def-item", "statement"}
 
 
@@ -65,6 +66,10 @@ def _table_lines(table: ET.Element) -> list[str]:
             target += [_row(tr) for tr in part if _local(tr.tag) == "tr"]
     if not header and not body:  # rows directly under <table>
         body = [_row(tr) for tr in table if _local(tr.tag) == "tr"]
+    if not header and table.find(".//th") is not None:
+        first = next((tr for tr in table.iter() if _local(tr.tag) == "tr"), None)
+        if first is not None and all(_local(c.tag) == "th" for c in first):
+            header, body = body[:1], body[1:]
     return rows_to_lines(header, body)
 
 
@@ -125,10 +130,24 @@ class _Collector:
             if caption:
                 self.buffer.append(caption)
             return
-        if tag in _BLOCK_TAGS and not any(
-            _local(c.tag) in _BLOCK_TAGS for c in el.iter() if c is not el
-        ):
-            if value := _text(el):
+        if tag in _BLOCK_TAGS:
+            nested = [c for c in el if _local(c.tag) in _NESTED_BLOCKS]
+            if not nested:
+                if value := _text(el):
+                    self.buffer.append(value)
+                return
+            # "<p>Groups were defined as: <list>...</list></p>": keep the lead-in text, then
+            # the nested list items / tables in document order.
+            own = [el.text or ""]
+            for child in el:
+                if child in nested:
+                    if value := " ".join(normalize_text("".join(own)).split()):
+                        self.buffer.append(value)
+                    own = [child.tail or ""]
+                    self.walk(child)
+                else:
+                    own += ["".join(child.itertext()), child.tail or ""]
+            if value := " ".join(normalize_text("".join(own)).split()):
                 self.buffer.append(value)
             return
         for child in el:
@@ -155,4 +174,10 @@ def extract_jats(path: Path) -> list[Section]:
     if body is not None:
         collector.walk(body)
     collector.flush()
+    # Some publishers move tables and figures out of <body> into <floats-group>.
+    floats = root.find("floats-group")
+    if floats is not None:
+        collector.path = ["Tables and figures"]
+        collector.walk(floats)
+        collector.flush()
     return collector.sections
