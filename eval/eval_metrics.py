@@ -219,7 +219,7 @@ def summarize_by(
 def refusal_reasons(outcomes: list[EvalOutcome]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for o in outcomes:
-        name = o.refusal_reason or "ANSWERED"
+        name = str(o.refusal_reason) if o.refusal_reason else "ANSWERED"
         counts[name] = counts.get(name, 0) + 1
     return dict(sorted(counts.items()))
 
