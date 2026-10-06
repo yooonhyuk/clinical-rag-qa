@@ -78,6 +78,23 @@ async def test_ask_returns_answer_sources_latency_and_usage(settings, factory) -
     }
 
 
+async def test_ask_returns_partial_answer_with_caveat(settings, factory) -> None:
+    llm = FakeOllama(
+        answer=GroundedAnswer(
+            answer="직접 비교는 없지만 한쪽 기준은 확인됩니다 [1].",
+            cited_context_ids=[1],
+            insufficient_evidence=True,
+        )
+    )
+    client, _ = _client(settings, factory, llm)
+    async with client:
+        body = (await client.post("/api/ask", json={"question": "두 기준을 비교해 줘"})).json()
+    assert body["refused"] is False and body["refusalReason"] is None
+    assert body["partial"] is True and body["caveat"]
+    assert body["sources"][0]["fileName"] == "dicom-upload-guide.md"
+    assert body["sources"][0]["rerankScore"] is None
+
+
 async def test_ask_refuses_diagnosis(settings, factory) -> None:
     client, _ = _client(settings, factory)
     async with client:

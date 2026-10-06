@@ -32,6 +32,7 @@ class RetrievedChunk:
     text: str
     score: float  # cosine similarity (1 - cosine distance)
     lexical_score: float | None = None  # pg_trgm word_similarity(question, text), hybrid only
+    rerank_score: float | None = None  # cross-encoder relevance (0..1), reranker only
 
 
 def _to_chunk(chunk: Chunk, file_name: str, score: float, lexical: float | None) -> RetrievedChunk:

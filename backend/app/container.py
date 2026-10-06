@@ -16,6 +16,7 @@ from app.services.llm_types import GenerationClient
 from app.services.ollama_client import OllamaClient
 from app.services.prompt_builder import load_prompt
 from app.services.rag_service import RagService, ScopeClassifier
+from app.services.reranker import CrossEncoderReranker, Reranker
 from app.services.scope_classifier import (
     EmbeddingScopeClassifier,
     Mvp1RegexScopeClassifier,
@@ -76,12 +77,25 @@ def build_scope_classifier(settings: Settings, embeddings: EmbeddingService) -> 
             )
 
 
+def build_reranker(settings: Settings) -> Reranker | None:
+    if settings.reranker == "none":
+        return None
+    reranker = CrossEncoderReranker(
+        settings.reranker_model,
+        revision=settings.reranker_revision,
+        device=settings.reranker_device,
+    )
+    reranker.load()  # fail at startup (RerankerUnavailableError), not on the first question
+    return reranker
+
+
 def build_container(
     settings: Settings,
     *,
     ollama: OllamaClient | None = None,
     generator: GenerationClient | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
+    reranker: Reranker | None = None,
 ) -> AppContainer:
     if ollama is None:
         ollama = OllamaClient.create(
@@ -91,6 +105,8 @@ def build_container(
             timeout_sec=settings.ollama_timeout_sec,
             max_retries=settings.ollama_max_retries,
         )
+    if reranker is None:
+        reranker = build_reranker(settings)
     if generator is None:
         generator = build_generator(settings, ollama)
     else:
@@ -128,6 +144,10 @@ def build_container(
             hybrid=settings.hybrid_search,
             rrf_k=settings.rrf_k,
             scope=build_scope_classifier(settings, embeddings),
+            reranker=reranker,
+            rerank_candidates=settings.rerank_candidates,
+            rerank_min_score=settings.rerank_min_score,
+            partial_answers=settings.partial_answers,
         ),
         dicom=DicomService(
             dicom_llm,

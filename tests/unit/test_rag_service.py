@@ -11,12 +11,14 @@ from app.services.llm_types import (
     StructuredOutputError,
 )
 from app.services.rag_service import (
+    PARTIAL_CAVEAT,
     REFUSAL_MESSAGE,
     RagService,
     RefusalReason,
     extract_citations,
     is_out_of_scope,
 )
+from app.services.reranker import rerank_chunks
 from app.services.vector_search_service import rrf_fuse
 from tests.fakes import DIM, FakeOllama, FakeSession, make_chunk
 
@@ -165,3 +167,160 @@ async def test_hybrid_flag_controls_query_text_passed_to_search() -> None:
         )
         await rag.retrieve(FakeSession(), "업로드 용량", top_k=3)
     assert seen == ["업로드 용량", None]
+
+
+# --- partial answers (docs/issues/007) -------------------------------------------------------
+
+
+def _flagged(answer: str, cited: list[int]) -> FakeOllama:
+    return FakeOllama(
+        answer=GroundedAnswer(answer=answer, cited_context_ids=cited, insufficient_evidence=True)
+    )
+
+
+async def test_flagged_answer_with_citations_is_a_partial_answer_not_a_refusal() -> None:
+    chunks = [make_chunk("a.md"), make_chunk("b.md")]
+    llm = _flagged("직접 비교는 없습니다. 다만 최소 2주기 이상 투여합니다 [2].", [2])
+    result = await _service(llm, chunks).ask(FakeSession(), "q", top_k=5)
+    assert not result.refused and result.refusal_reason is None
+    assert result.partial and result.caveat == PARTIAL_CAVEAT
+    assert [s.file_name for s in result.sources] == ["b.md"]
+
+
+async def test_flagged_answer_with_only_text_citations_is_partial() -> None:
+    llm = _flagged("구체적 정의는 없지만 2배 이상 증가로 봅니다 [1].", [])
+    result = await _service(llm, [make_chunk()]).ask(FakeSession(), "q", top_k=5)
+    assert result.partial and result.citation_mode == "parsed"
+
+
+@pytest.mark.parametrize(
+    ("answer", "cited"),
+    [
+        ("관련 내용이 없습니다.", []),  # flagged, no citation at all
+        (REFUSAL_MESSAGE, [1]),  # explicit refusal sentence, ids only in the structured field
+        ("근거 없음 [7]", [9]),  # citations that point outside the context are not citations
+    ],
+)
+async def test_flagged_answer_without_valid_citations_is_still_refused(
+    answer: str, cited: list[int]
+) -> None:
+    result = await _service(_flagged(answer, cited), [make_chunk()]).ask(
+        FakeSession(), "q", top_k=5
+    )
+    assert result.refused and result.refusal_reason == RefusalReason.MODEL_REFUSED
+    assert not result.partial and result.sources == []
+
+
+async def test_partial_answers_off_restores_mvp1_refusal() -> None:
+    async def search(session, vector, *, top_k, **_):
+        return [make_chunk()]
+
+    rag = RagService(
+        EmbeddingService(FakeOllama(), dimension=DIM),
+        _flagged("일부만 확인됩니다 [1].", [1]),
+        system_prompt="sys",
+        min_score=0.5,
+        search=search,
+        partial_answers=False,
+    )
+    result = await rag.ask(FakeSession(), "q", top_k=5)
+    assert result.refused and not result.partial
+
+
+async def test_normal_answer_is_not_partial_and_records_schema_validity() -> None:
+    result = await _service(FakeOllama(), [make_chunk()]).ask(FakeSession(), "q", top_k=5)
+    assert not result.partial and result.caveat is None
+    assert result.meta["schemaValid"] is True
+
+
+# --- cross-encoder reranker (B7) -------------------------------------------------------------
+
+
+class FakeReranker:
+    model = "fake-reranker"
+
+    def __init__(self, scores: dict[str, float]) -> None:
+        self.scores = scores
+        self.calls: list[tuple[str, int]] = []
+
+    async def score(self, query: str, texts: list[str]) -> list[float]:
+        self.calls.append((query, len(texts)))
+        return [self.scores.get(t, 0.0) for t in texts]
+
+
+def _reranked_service(
+    llm: FakeOllama,
+    chunks: list,
+    reranker: FakeReranker,
+    *,
+    min_score: float = 0.45,
+    rerank_min_score: float = 0.2,
+) -> tuple[RagService, list[int]]:
+    asked: list[int] = []
+
+    async def search(session, vector, *, top_k, **_):
+        asked.append(top_k)
+        return chunks[:top_k]
+
+    rag = RagService(
+        EmbeddingService(llm, dimension=DIM),
+        llm,
+        system_prompt="sys",
+        min_score=min_score,
+        search=search,
+        reranker=reranker,
+        rerank_candidates=4,
+        rerank_min_score=rerank_min_score,
+    )
+    return rag, asked
+
+
+def _texts(n: int) -> list:
+    return [make_chunk(f"{i}.md", 0.9 - i * 0.05, text=f"t{i}") for i in range(n)]
+
+
+async def test_reranker_fetches_candidates_and_keeps_best_top_k() -> None:
+    reranker = FakeReranker({"t3": 0.9, "t0": 0.5, "t2": 0.1})
+    rag, asked = _reranked_service(FakeOllama(), _texts(6), reranker)
+    chunks, _ = await rag.retrieve(FakeSession(), "q", top_k=2)
+    assert asked == [4] and reranker.calls == [("q", 4)]
+    assert [c.file_name for c in chunks] == ["3.md", "0.md"]
+    assert [c.rerank_score for c in chunks] == [0.9, 0.5]
+
+
+async def test_rerank_gate_refuses_without_llm_when_best_rerank_is_low() -> None:
+    llm = FakeOllama()
+    rag, _ = _reranked_service(llm, _texts(4), FakeReranker({"t1": 0.1}))
+    result = await rag.ask(FakeSession(), "q", top_k=2)
+    assert result.refused and result.refusal_reason == RefusalReason.NO_EVIDENCE
+    assert llm.generate_calls == []
+    assert result.meta["gate"] == {"bestCosine": pytest.approx(0.9), "topRerank": 0.1}
+
+
+async def test_cosine_gate_still_applies_with_reranker() -> None:
+    llm = FakeOllama()
+    chunks = [make_chunk("a.md", 0.3, text="a")]
+    rag, _ = _reranked_service(llm, chunks, FakeReranker({"a": 0.99}), min_score=0.45)
+    result = await rag.ask(FakeSession(), "q", top_k=2)
+    assert result.refusal_reason == RefusalReason.NO_EVIDENCE and llm.generate_calls == []
+
+
+async def test_reranked_top_k_all_go_into_the_prompt_in_rerank_order() -> None:
+    llm = FakeOllama()
+    rag, _ = _reranked_service(llm, _texts(4), FakeReranker({"t2": 0.8, "t1": 0.01}))
+    result = await rag.ask(FakeSession(), "q", top_k=2)
+    assert not result.refused
+    prompt = llm.generate_calls[0]
+    assert prompt.index("2.md") < prompt.index("1.md")  # low rerank score still in context
+
+
+def test_rerank_chunks_rejects_mismatched_scores() -> None:
+    with pytest.raises(ValueError):
+        rerank_chunks([make_chunk()], [0.1, 0.2], top_k=1)
+
+
+def test_no_reranker_by_default() -> None:
+    from app.config import Settings
+    from app.container import build_reranker
+
+    assert build_reranker(Settings(_env_file=None)) is None

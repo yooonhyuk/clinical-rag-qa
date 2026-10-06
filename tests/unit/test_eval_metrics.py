@@ -1,7 +1,16 @@
 from pathlib import Path
 
+import pytest
 import yaml
-from eval_metrics import EvalOutcome, EvalQuestion, failed_questions, percentile, summarize
+from eval_metrics import (
+    EvalOutcome,
+    EvalQuestion,
+    failed_questions,
+    is_korean,
+    percentile,
+    refusal_reasons,
+    summarize,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -133,3 +142,54 @@ def test_public_question_set_is_well_formed() -> None:
             assert all((public / f).is_file() for f in q.expected_files), q.id
         else:
             assert q.qtype in {"no_answer", "diagnosis_request", "out_of_scope"}, q.id
+
+
+def _scored(q: EvalQuestion, *, refused: bool = False, partial: bool = False) -> EvalOutcome:
+    return EvalOutcome(
+        q,
+        ["a.md"],
+        [None],
+        [] if refused else ["a.md"],
+        "답변 [1]",
+        refused,
+        "MODEL_REFUSED" if refused else None,
+        1,
+        1,
+        partial=partial,
+        schema_valid=True,
+    )
+
+
+def test_partial_answers_are_answered_and_scored_separately() -> None:
+    answerable = EvalQuestion.from_dict(
+        {"id": "a", "question": "q", "expected_sources": [{"file": "a.md"}]}
+    )
+    refuse = EvalQuestion.from_dict({"id": "r", "question": "q", "answerable": False})
+    outs = [
+        _scored(answerable),
+        _scored(answerable, partial=True),
+        _scored(answerable, refused=True),
+        _scored(refuse, refused=True),
+        _scored(refuse, partial=True),
+    ]
+    s = summarize(outs)
+    assert s["false_refusal_rate"] == pytest.approx(1 / 3)
+    assert s["partial_answer_rate"] == pytest.approx(1 / 3)
+    assert s["legacy_false_refusal_rate"] == pytest.approx(2 / 3)
+    assert s["refusal_correctness"] == 0.5 and s["legacy_refusal_correctness"] == 1.0
+    assert s["must_refuse_partial"] == 1
+    assert s["schema_valid_rate"] == 1.0 and s["korean_answer_rate"] == 1.0
+    assert refusal_reasons(outs)["ANSWERED_PARTIAL"] == 2
+    assert dict(failed_questions(outs))["r"] == "should refuse but a partial answer"
+
+
+@pytest.mark.parametrize(
+    ("text", "korean"),
+    [
+        ("최소 2주기 이상 [1]", True),
+        ("At least two cycles [1]", False),
+        ("RECIST 1.1 기준으로 판정", True),
+    ],
+)
+def test_is_korean(text: str, korean: bool) -> None:
+    assert is_korean(text) is korean

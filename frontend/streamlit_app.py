@@ -105,6 +105,8 @@ with tab_ask:
         if result:
             if result["refused"]:
                 st.warning(f"거절됨 ({result['refusalReason']})")
+            elif result.get("partial"):
+                st.info(f"부분 답변: {result.get('caveat') or ''}")
             st.markdown(result["answer"])
             st.subheader("출처")
             for s in result["sources"]:

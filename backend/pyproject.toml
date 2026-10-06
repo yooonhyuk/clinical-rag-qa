@@ -19,6 +19,14 @@ dependencies = [
     "pypdf>=6.0",
 ]
 
+[project.optional-dependencies]
+# B7 cross-encoder reranker (BAAI/bge-reranker-v2-m3). Not in the default api image:
+# `uv sync --extra rerank` (torch is large). See docs/decisions/0004-reranker.md.
+rerank = [
+    "torch>=2.4",
+    "transformers>=4.44",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.2",

@@ -78,6 +78,22 @@ class Settings(BaseSettings):
     hybrid_search: bool = False
     rrf_k: int = Field(default=60, ge=1)
 
+    # Optional cross-encoder reranking (B7, needs `uv sync --extra rerank` and the model files in
+    # the local Hugging Face cache or RERANKER_MODEL=<folder>). See services/reranker.py and
+    # docs/decisions/0004-reranker.md. Retrieve RERANK_CANDIDATES by cosine, keep the best TOP_K
+    # by cross-encoder score, and refuse (NO_EVIDENCE) when the best rerank score is below
+    # RERANK_MIN_SCORE. The cosine gate (MIN_RELEVANCE_SCORE) still applies to the best candidate.
+    reranker: Literal["none", "bge-reranker-v2-m3"] = "none"
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"  # HF repo id (cache only) or a local folder
+    reranker_revision: str = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+    reranker_device: Literal["auto", "mps", "cuda", "cpu"] = "auto"
+    rerank_candidates: int = Field(default=30, ge=1, le=200)
+    rerank_min_score: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    # Return answers the model flagged as insufficient but that cite evidence, with a caveat
+    # (docs/issues/007). False = MVP-1 behaviour: every flagged answer is a MODEL_REFUSED refusal.
+    partial_answers: bool = True
+
     # OUT_OF_SCOPE (clinical-judgement request) detection, see services/scope_classifier.py.
     # embedding = precise regex + kNN margin over rules/scope_exemplars.yaml (default)
     # regex     = precise regex only;  mvp1 = the MVP-1 regex (baseline, over-refuses)

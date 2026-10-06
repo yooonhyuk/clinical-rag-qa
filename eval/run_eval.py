@@ -20,8 +20,11 @@ Examples:
 name used to filter retrieval comes from the folder's .corpus.yaml `name:` (else the folder
 name). Without `--corpus` the runner behaves like MVP-1: RAW_DOCS_PATH, no corpus filter.
 
-Extension points for the next stage: `--generator-model` swaps the Ollama LLM (e.g.
-medgemma:4b) and `--reranker` is reserved (only `none` is implemented). The anthropic provider
+`--generator-model` swaps the Ollama LLM (e.g. medgemma:4b). `--reranker bge-reranker-v2-m3`
+adds the cross-encoder stage (`uv sync --extra rerank`, model in the local HF cache);
+`--rerank-min-score 0` records every question's rerank score without gating, so a gate can be
+tuned offline on the dev split (eval/tune_gate.py). `--partial-answers off` scores with the
+MVP-1 policy (cited-but-flagged answers are refusals). The anthropic provider
 only runs when ANTHROPIC_API_KEY is set and the external-LLM guardrail passes; otherwise it is
 reported as skipped. No numbers are ever fabricated: a provider that did not run has none.
 """
@@ -31,6 +34,7 @@ import asyncio
 import hashlib
 import json
 import os
+import resource
 import subprocess
 import sys
 from datetime import datetime
@@ -70,6 +74,11 @@ METRIC_LABELS = {
     "keyword_coverage": "Keyword coverage",
     "refusal_correctness": "Refusal accuracy (must-refuse)",
     "false_refusal_rate": "False refusal rate (answerable)",
+    "partial_answer_rate": "Partial answers with caveat (answerable)",
+    "legacy_false_refusal_rate": "False refusal if partial = refusal (MVP-1 policy)",
+    "legacy_refusal_correctness": "Refusal accuracy if partial = refusal (MVP-1 policy)",
+    "korean_answer_rate": "Answers in Korean (answered)",
+    "schema_valid_rate": "JSON schema-valid generations",
     "retrieval_ms_p50": "Retrieval p50 (ms)",
     "retrieval_ms_p95": "Retrieval p95 (ms)",
     "generation_ms_p50": "Generation p50 (ms)",
@@ -83,8 +92,10 @@ GROUP_METRICS = (
     "hit_at_k",
     "section_hit_at_k",
     "citation_correctness",
+    "keyword_coverage",
     "refusal_correctness",
     "false_refusal_rate",
+    "partial_answer_rate",
     "total_ms_p50",
 )
 
@@ -109,6 +120,10 @@ def resolve_corpus(value: str | None) -> tuple[Path | None, str | None]:
     if not root.is_dir():
         raise SystemExit(f"corpus folder not found: {root}")
     return root, corpus_name(root, get_settings().corpus_marker_file)
+
+
+def _round(value: float | None) -> float | None:
+    return None if value is None else round(value, 4)
 
 
 async def run_question(
@@ -140,10 +155,17 @@ async def run_question(
         generation_ms=r.generation_ms,
         input_tokens=r.usage.input_tokens if r.usage else None,
         output_tokens=r.usage.output_tokens if r.usage else None,
+        partial=r.partial,
+        schema_valid=r.meta.get("schemaValid"),  # type: ignore[arg-type]
         extra={
             "citationMode": r.citation_mode,
+            "gate": r.meta.get("gate"),
+            "retrievedScores": [
+                {"cosine": round(c.score, 4), "rerank": _round(c.rerank_score)} for c in r.retrieved
+            ],
             # what the NO_EVIDENCE threshold compares against: best cosine among retrieved
             "maxCosine": max((c.score for c in retrieved), default=None),
+            "topRerank": retrieved[0].rerank_score if retrieved else None,
             "scope": r.meta.get("scope"),
             # what retrieval would have returned (also for OUT_OF_SCOPE refusals)
             "probe": [
@@ -179,7 +201,23 @@ async def run_provider(
         config = {
             "provider": provider,
             "generator_model": model,
-            "reranker": overrides.get("_reranker", "none"),
+            "reranker": settings.reranker,
+            **(
+                {
+                    "reranker_model": settings.reranker_model,
+                    "reranker_revision": settings.reranker_revision,
+                    "reranker_device": getattr(container.rag._reranker, "device", None),
+                    "rerank_candidates": settings.rerank_candidates,
+                    "rerank_min_score": settings.rerank_min_score,
+                }
+                if settings.reranker != "none"
+                else {}
+            ),
+            "partial_answers": settings.partial_answers,
+            # eval process (incl. an in-process reranker); Ollama runs in its own process
+            "eval_process_max_rss_mb": round(
+                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
+            ),
             "embedding_model": settings.ollama_embedding_model,
             "embedding_dim": settings.embedding_dimension,
             "hybrid_search": settings.hybrid_search,
@@ -205,11 +243,16 @@ def question_record(o: EvalOutcome) -> dict[str, Any]:
         "answerable": q.answerable,
         "refused": o.refused,
         "refusalReason": o.refusal_reason,
+        "partial": o.partial,
+        "schemaValid": o.schema_valid,
         "hit": o.hit if q.answerable else None,
         "sectionHit": o.section_hit if q.answerable else None,
         "citationCorrect": o.citation_correct if q.answerable and not o.refused else None,
         "citationLocated": o.citation_located if q.answerable and not o.refused else None,
         "maxCosine": o.extra.get("maxCosine"),
+        "topRerank": o.extra.get("topRerank"),
+        "gate": o.extra.get("gate"),
+        "retrievedScores": o.extra.get("retrievedScores"),
         "scope": o.extra.get("scope"),
         "retrieved": [
             {"file": f, "section": s, "page": p}
@@ -236,6 +279,14 @@ def question_record(o: EvalOutcome) -> dict[str, Any]:
         "generationMs": o.generation_ms,
         "error": o.error,
     }
+
+
+def _result(o: EvalOutcome) -> str:
+    return (
+        str(o.refusal_reason)
+        if o.refusal_reason
+        else ("ANSWERED_PARTIAL" if o.partial else "ANSWERED")
+    )
 
 
 def _fmt(key: str, value: Any) -> str:
@@ -278,6 +329,7 @@ def render_report(
         *(f"| {label} | {_fmt(key, overall[key])} |" for key, label in METRIC_LABELS.items()),
         f"| Questions (answerable / must-refuse) / errors | {overall['questions']} "
         f"({overall['answerable']} / {overall['unanswerable']}) / {overall['errors']} |",
+        f"| Must-refuse questions answered partially | {overall['must_refuse_partial']} |",
         "",
         f"Refusal reasons: {summary['refusal_reasons']}",
         "",
@@ -298,8 +350,7 @@ def render_report(
         hit = "-" if not q.answerable else ("Y" if o.hit else "N")
         sec = "-" if not q.answerable else ("Y" if o.section_hit else "N")
         lines.append(
-            f"| {q.id} | {q.qtype} | {q.lang} | {o.refusal_reason or 'ANSWERED'} | {hit} | "
-            f"{sec} | {cited} | {answer} |"
+            f"| {q.id} | {q.qtype} | {q.lang} | {_result(o)} | {hit} | {sec} | {cited} | {answer} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -330,9 +381,11 @@ async def main() -> int:
     parser.add_argument("--reindex", action="store_true", help="index the corpus folder first")
     parser.add_argument("--hybrid", choices=["on", "off"], help="override HYBRID_SEARCH")
     parser.add_argument("--generator-model", help="override OLLAMA_LLM_MODEL (e.g. medgemma:4b)")
-    parser.add_argument(
-        "--reranker", choices=["none"], default="none", help="reserved for the next stage"
-    )
+    parser.add_argument("--reranker", choices=["none", "bge-reranker-v2-m3"])
+    parser.add_argument("--rerank-candidates", type=int, help="override RERANK_CANDIDATES")
+    parser.add_argument("--rerank-min-score", type=float, help="override RERANK_MIN_SCORE")
+    parser.add_argument("--min-relevance-score", type=float, help="override MIN_RELEVANCE_SCORE")
+    parser.add_argument("--partial-answers", choices=["on", "off"])
     parser.add_argument("--scope-classifier", choices=["embedding", "regex", "mvp1"])
     parser.add_argument("--label", help="config label used in the result folder name")
     parser.add_argument("--out", type=Path, default=RESULTS, help="results root")
@@ -353,6 +406,16 @@ async def main() -> int:
         overrides["ollama_llm_model"] = args.generator_model
     if args.scope_classifier:
         overrides["scope_classifier"] = args.scope_classifier
+    if args.reranker:
+        overrides["reranker"] = args.reranker
+    if args.rerank_candidates is not None:
+        overrides["rerank_candidates"] = args.rerank_candidates
+    if args.rerank_min_score is not None:
+        overrides["rerank_min_score"] = args.rerank_min_score
+    if args.min_relevance_score is not None:
+        overrides["min_relevance_score"] = args.min_relevance_score
+    if args.partial_answers:
+        overrides["partial_answers"] = args.partial_answers == "on"
     providers = args.provider or ["ollama"]
     run_at = datetime.now()
     c_hash = corpus_hash(root)
@@ -375,6 +438,8 @@ async def main() -> int:
             print(f"[{provider}] skipped: guardrail — {exc}")
             continue
         hybrid = "hybrid" if config["hybrid_search"] else "vector"
+        if config["reranker"] != "none":
+            hybrid += "-rerank"
         label = args.label or f"{config['embedding_model']}-{hybrid}-{config['generator_model']}"
         label = label.replace(":", "-").replace("/", "-")
         config = {

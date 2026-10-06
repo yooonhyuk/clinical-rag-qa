@@ -23,6 +23,7 @@ def _source(chunk: RetrievedChunk) -> SourceOut:
         section_title=chunk.section_title,
         chunk_index=chunk.chunk_index,
         score=round(chunk.score, 4),
+        rerank_score=None if chunk.rerank_score is None else round(chunk.rerank_score, 4),
     )
 
 
@@ -40,6 +41,8 @@ async def ask(body: QuestionRequest, container: ContainerDep, session: SessionDe
         sources=[_source(c) for c in result.sources],
         refused=result.refused,
         refusal_reason=result.refusal_reason,
+        partial=result.partial,
+        caveat=result.caveat,
         citation_mode=result.citation_mode,
         latency_ms=LatencyOut(retrieval=result.retrieval_ms, generation=result.generation_ms),
         llm=(
@@ -78,6 +81,7 @@ async def retrieve(
                     "chunkIndex": c.chunk_index,
                     "pageNumber": c.page_number,
                     "sectionTitle": c.section_title,
+                    "rerankScore": c.rerank_score,
                 },
             )
             for c in chunks

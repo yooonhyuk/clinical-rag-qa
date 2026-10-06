@@ -113,6 +113,10 @@ class EvalOutcome:
     retrieved_pages: list[int | None] = field(default_factory=list)
     cited_sections: list[str | None] = field(default_factory=list)
     cited_pages: list[int | None] = field(default_factory=list)
+    # answered from part of the evidence with a caveat (docs/issues/007); never `refused`
+    partial: bool = False
+    # False when the generator broke the JSON schema (None: no generation happened)
+    schema_valid: bool | None = None
 
     def _located(
         self, files: list[str], sections: list[str | None], pages: list[int | None]
@@ -161,6 +165,14 @@ class EvalOutcome:
         return sum(t.lower() in answer for t in terms) / len(terms)
 
 
+def is_korean(text: str, threshold: float = 0.3) -> bool:
+    """Hangul syllables are at least `threshold` of the letters (the prompt asks for Korean)."""
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return False
+    return sum(bool(_HANGUL_RE.match(ch)) for ch in letters) / len(letters) >= threshold
+
+
 def _ratio(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
 
@@ -182,6 +194,7 @@ def summarize(outcomes: list[EvalOutcome]) -> dict[str, Any]:
     totals = [o.retrieval_ms + o.generation_ms for o in ok]
     tokens_in = [o.input_tokens for o in ok if o.input_tokens is not None]
     tokens_out = [o.output_tokens for o in ok if o.output_tokens is not None]
+    schema = [o.schema_valid for o in ok if o.schema_valid is not None]
     return {
         "questions": len(outcomes),
         "errors": len(outcomes) - len(ok),
@@ -196,6 +209,18 @@ def summarize(outcomes: list[EvalOutcome]) -> dict[str, Any]:
         ),
         "refusal_correctness": _ratio(sum(o.refused for o in unanswerable), len(unanswerable)),
         "false_refusal_rate": _ratio(sum(o.refused for o in answerable), len(answerable)),
+        # cited-but-flagged answers returned with a caveat (counted as answered above)
+        "partial_answer_rate": _ratio(sum(o.partial for o in answerable), len(answerable)),
+        "must_refuse_partial": sum(o.partial for o in unanswerable),
+        # the same run scored with the MVP-1 policy (every flagged answer is a refusal)
+        "legacy_false_refusal_rate": _ratio(
+            sum(o.refused or o.partial for o in answerable), len(answerable)
+        ),
+        "legacy_refusal_correctness": _ratio(
+            sum(o.refused or o.partial for o in unanswerable), len(unanswerable)
+        ),
+        "korean_answer_rate": _ratio(sum(is_korean(o.answer) for o in answered), len(answered)),
+        "schema_valid_rate": _ratio(sum(schema), len(schema)),
         "retrieval_ms_p50": percentile([o.retrieval_ms for o in ok], 50),
         "retrieval_ms_p95": percentile([o.retrieval_ms for o in ok], 95),
         "generation_ms_p50": percentile([o.generation_ms for o in generated], 50),
@@ -219,7 +244,11 @@ def summarize_by(
 def refusal_reasons(outcomes: list[EvalOutcome]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for o in outcomes:
-        name = str(o.refusal_reason) if o.refusal_reason else "ANSWERED"
+        name = (
+            str(o.refusal_reason)
+            if o.refusal_reason
+            else ("ANSWERED_PARTIAL" if o.partial else "ANSWERED")
+        )
         counts[name] = counts.get(name, 0) + 1
     return dict(sorted(counts.items()))
 
@@ -232,7 +261,8 @@ def failed_questions(outcomes: list[EvalOutcome]) -> list[tuple[str, str]]:
         if o.error:
             failures.append((q.id, f"error: {o.error}"))
         elif not q.answerable and not o.refused:
-            failures.append((q.id, "should refuse but answered"))
+            kind = "a partial answer" if o.partial else "answered"
+            failures.append((q.id, f"should refuse but {kind}"))
         elif q.answerable and o.refused:
             failures.append((q.id, f"false refusal ({o.refusal_reason})"))
         elif q.answerable:

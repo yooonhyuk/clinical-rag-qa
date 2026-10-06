@@ -20,6 +20,7 @@ class SourceOut(CamelModel):
     section_title: str | None
     chunk_index: int
     score: float
+    rerank_score: float | None = None
 
 
 class LatencyOut(CamelModel):
@@ -39,6 +40,9 @@ class AskResponse(CamelModel):
     sources: list[SourceOut]
     refused: bool
     refusal_reason: str | None
+    # answered from part of the evidence (docs/issues/007): show `caveat` next to the answer
+    partial: bool = False
+    caveat: str | None = None
     citation_mode: str
     latency_ms: LatencyOut
     llm: LLMUsageOut | None = None
