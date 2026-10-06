@@ -16,3 +16,9 @@ eval/reports/*.md
 !eval/reports/.gitkeep
 .DS_Store
 eval/reports/*.json
+# Copyrighted originals are local-only (scripts/fetch-originals.sh -> ~/clinical-rag-private).
+# Guard against copying them into the repo by accident.
+clinical-rag-private/
+corpus/private/
+corpus/originals/
+corpus/**/*.part

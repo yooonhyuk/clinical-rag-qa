@@ -1,4 +1,5 @@
-# Corpus classification marker (read by app/services/llm_guardrail.py).
+# Corpus classification marker (read by app/services/llm_guardrail.py and the indexer).
 # Every document in this folder is fictional and written for the demo — no real patient data,
 # no company documents. Only folders marked like this may be used with an external LLM provider.
+name: toy
 classification: synthetic-sample

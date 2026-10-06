@@ -1,0 +1,8 @@
+# Corpus classification marker (read by app/services/llm_guardrail.py and the indexer).
+# Public regulatory guidance, CC BY 4.0 articles and an unmodified DICOM standard excerpt
+# (sources and licenses: corpus/SOURCES.md). No patient data, nothing confidential.
+# `public-regulatory` counts as non-sensitive for the external-LLM guardrail: with
+# ALLOW_EXTERNAL_LLM=true this folder MAY be sent to an external provider. The default stays
+# local-only (LLM_PROVIDER=ollama), and the eval in this repo never uses an external provider.
+name: public
+classification: public-regulatory

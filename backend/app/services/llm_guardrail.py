@@ -5,7 +5,8 @@ non-sensitive sample corpora. Anthropic mode is allowed only when ALL of these h
 
 1. `ALLOW_EXTERNAL_LLM=true`
 2. the corpus root (RAW_DOCS_PATH, and any folder indexed later) contains a marker file
-   (`.corpus.yaml`) with `classification: synthetic-sample` or `non-sensitive`
+   (`.corpus.yaml`) with `classification: synthetic-sample`, `non-sensitive` or
+   `public-regulatory` (public regulatory guidance / open-licensed articles, corpus/public)
 3. `ANTHROPIC_API_KEY` is set in the environment
 
 Otherwise the app refuses to start. Even in anthropic mode, DICOM-derived data is never sent
@@ -18,7 +19,10 @@ import yaml
 
 from app.config import Settings
 
-ALLOWED_CLASSIFICATIONS = frozenset({"synthetic-sample", "non-sensitive"})
+# `public-regulatory` is a non-sensitive subtype: published guidance and open-licensed text
+# (corpus/public). It is allowed for the same reason as synthetic samples - nothing in it is
+# confidential - but the eval in this repo still runs local-only (Ollama).
+ALLOWED_CLASSIFICATIONS = frozenset({"synthetic-sample", "non-sensitive", "public-regulatory"})
 
 
 class ExternalLLMNotAllowedError(RuntimeError):

@@ -12,7 +12,7 @@ EVAL_OLLAMA_URL   ?= http://localhost:11434
 
 .PHONY: help setup samples seed lint format test test-unit test-integration \
         up up-host-ollama down logs pull-models migrate reset-embeddings index eval api ui bundle offline-up verify-offline \
-        dicom-scan dicom-rules
+        dicom-scan dicom-rules corpus-verify fetch-originals
 
 help:  ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-18s %s\n",$$1,$$2}'
@@ -28,6 +28,13 @@ seed:  ## copy sample docs (incl. .corpus.yaml marker) and DICOM into data/raw-d
 	mkdir -p data/raw-docs/documents data/raw-docs/dicom
 	cp -R samples/documents/. data/raw-docs/documents/
 	cp -R samples/dicom/. data/raw-docs/dicom/
+
+corpus-verify:  ## check corpus/public against corpus/SHA256SUMS
+	cd corpus && shasum -a 256 -c SHA256SUMS
+
+ORIGINALS_DIR ?= $(HOME)/clinical-rag-private/originals
+fetch-originals:  ## LOCAL ONLY: download copyrighted originals to ORIGINALS_DIR (never into the repo)
+	./scripts/fetch-originals.sh $(ORIGINALS_DIR)
 
 dicom-scan:  ## Layer 1/2 DICOM check over a folder: make dicom-scan DIR=path [SCAN_ARGS="--json out.jsonl"]
 	$(UV) python -m app.cli.dicom_scan $(or $(DIR),samples/dicom) $(SCAN_ARGS)

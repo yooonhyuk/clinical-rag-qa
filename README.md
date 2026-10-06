@@ -344,3 +344,25 @@ HYBRID_SEARCH=true  make eval
 - anthropic 모드의 가드레일은 "표식이 붙은 폴더만 인덱싱한다"까지 보장합니다. 이전에 ollama 모드로 인덱싱해 DB에 이미 들어 있는 문서까지 검사하지는 않으므로, Provider를 바꿀 때는 DB를 새로 만드는 것을 권장합니다.
 - **DICOM 규칙**: 파일 단위 검사입니다(series/study 일관성은 다음 단계). Type 1C/2C와 조건부 모듈은 평가하지 않고, 더미 치환·UID 치환·정제 여부는 파일 하나로 확인할 수 없어 참고로만 보고합니다. 픽셀은 읽지 않으므로 픽셀 내 식별정보는 위험 표시만 합니다. 합성 샘플로만 테스트했고 실제 공개 DICOM은 아직 돌리지 않았습니다. 자세한 내용은 [docs/dicom-rules.md](docs/dicom-rules.md#6-한계).
 - 스캔 PDF(OCR), DOCX·Excel, 문서 기반 업로드 기준 비교(DICOM Layer 3), QC 시나리오 생성은 MVP-2 범위입니다.
+
+## 코퍼스와 출처 고지 (NOTICE)
+
+이 저장소에는 두 종류의 문서 코퍼스가 있습니다.
+
+| 코퍼스 | 위치 | 분류(`.corpus.yaml`) | 내용 |
+|---|---|---|---|
+| toy | `samples/documents/` | `synthetic-sample` | 직접 만든 가상 문서 6종 (평가셋 `eval/questions.yaml`) |
+| public | `corpus/public/` | `public-regulatory` | 공개 규제 가이드라인·CC BY 논문·DICOM 표준 발췌 11종 (평가셋 `eval/public_questions.yaml`) |
+| private | 저장소 밖 (`~/clinical-rag-private/originals`) | — | 재배포할 수 없는 원문(RECIST 1.1, Lugano, iRECIST, RANO 2.0, LYRIC, QIBA, 프로토콜 2건). `make fetch-originals`로 로컬에만 받음 |
+
+`corpus/public/`의 파일은 원본을 **수정하지 않고** 그대로 넣었습니다. 출처 URL, 판, 수집일, 라이선스는 [corpus/SOURCES.md](corpus/SOURCES.md)에, 무결성 해시는 `corpus/SHA256SUMS`(`make corpus-verify`)에 있습니다.
+
+- **FDA** *Clinical Trial Imaging Endpoint Process Standards* (2018): 미국 연방정부 저작물(public domain).
+- **ICH E6(R3)** (2025): © ICH. ICH 법적 고지에 따라 저작권 표시와 함께 복제(로고 제외).
+- **EMA** *Guideline on the clinical evaluation of anticancer medicinal products* Rev.6: © European Medicines Agency, 출처 표시 조건으로 복제 허용.
+- **식품의약품안전처** 안내서 3종(항암제 임상시험 가이드라인, ICH GCP 민원인 안내서, AI 디지털의료기기 폐암·폐결절 임상시험계획서 가이드라인): 공공저작물(저작권법 제24조의2), 출처: 식품의약품안전처.
+- **Europe PMC JATS 전문 3편**(iRECIST how-to, RECIL vs Lugano, RANO 2.0 review): 각 저자, CC BY 4.0.
+- **MIDI 비식별화 보고서**(arXiv:2303.10473): 각 저자, CC BY 4.0.
+- **DICOM PS3.15 Annex E** (2026d) HTML: © NEMA. NEMA 저작권 허락 범위의 무수정 발췌입니다. DICOM®은 NEMA의 등록상표입니다.
+
+이 문서들은 검색·평가용 코퍼스로만 쓰며, 이 시스템의 답변은 원문을 대신하지 않습니다. `public-regulatory` 분류는 외부 LLM 가드레일에서 non-sensitive로 취급합니다(`ALLOW_EXTERNAL_LLM=true`이면 외부 Provider 사용 가능). 다만 이 저장소의 평가는 모두 로컬 Ollama로만 실행합니다.

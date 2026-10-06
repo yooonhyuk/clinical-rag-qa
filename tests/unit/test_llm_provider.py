@@ -65,8 +65,11 @@ def test_anthropic_requires_api_key(settings: Settings) -> None:
         validate_provider(_anthropic(settings, anthropic_api_key=None))
 
 
-def test_anthropic_allowed_when_all_conditions_hold(settings: Settings) -> None:
-    _mark(settings.raw_docs_path, "non-sensitive")
+@pytest.mark.parametrize("classification", ["non-sensitive", "public-regulatory"])
+def test_anthropic_allowed_when_all_conditions_hold(
+    settings: Settings, classification: str
+) -> None:
+    _mark(settings.raw_docs_path, classification)
     generator = build_generator(_anthropic(settings), FakeOllama())  # type: ignore[arg-type]
     assert isinstance(generator, AnthropicGenerationClient)
     assert generator.model == "claude-opus-5-5"
@@ -91,6 +94,18 @@ def test_app_refuses_to_start_when_guardrail_fails(settings: Settings, monkeypat
     )
     with pytest.raises(ExternalLLMNotAllowedError), TestClient(create_app()):
         pass
+
+
+def test_repo_corpora_are_marked() -> None:
+    from app.services.llm_guardrail import corpus_classification
+
+    root = Path(__file__).resolve().parents[2]
+    assert corpus_classification(root / "samples" / "documents", ".corpus.yaml") == (
+        "synthetic-sample"
+    )
+    assert corpus_classification(root / "corpus" / "public", ".corpus.yaml") == (
+        "public-regulatory"
+    )
 
 
 # --- parity ------------------------------------------------------------------------------
