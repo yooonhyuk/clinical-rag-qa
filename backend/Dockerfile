@@ -18,12 +18,14 @@ COPY backend/ ./
 RUN uv sync --frozen --no-dev
 
 COPY samples /app/samples
+COPY corpus /app/corpus
 RUN useradd --create-home --uid 10001 app && mkdir -p /app/data && chown -R app /app/data
 USER app
 
 ENV RAW_DOCS_PATH=/app/data/raw-docs/documents \
     DICOM_PATH=/app/data/raw-docs/dicom \
-    SAMPLES_PATH=/app/samples
+    SAMPLES_PATH=/app/samples \
+    CORPORA_PATH=/app/corpus
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --retries=10 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"

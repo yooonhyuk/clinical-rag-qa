@@ -14,6 +14,7 @@ class DocumentOut(CamelModel):
     file_type: str
     status: str
     chunk_count: int
+    corpus: str | None = None
     error_type: str | None = None
     error_message: str | None = None
     created_at: datetime
@@ -26,6 +27,12 @@ class DocumentListResponse(CamelModel):
 
 class IndexRequest(CamelModel):
     path: str | None = Field(default=None, description="Folder to index. Defaults to RAW_DOCS_PATH")
+    corpus: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Corpus name for the indexed documents. Defaults to the folder's "
+        ".corpus.yaml name, else the folder name",
+    )
 
 
 class IndexResponse(CamelModel):

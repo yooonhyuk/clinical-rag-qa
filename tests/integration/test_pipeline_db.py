@@ -17,6 +17,7 @@ from app.services.vector_search_service import search_chunks
 from tests.fakes import DIM, FakeOllama
 
 pytestmark = pytest.mark.integration
+PUBLIC = Path(__file__).resolve().parents[2] / "corpus" / "public"
 
 
 @pytest.fixture
@@ -143,3 +144,32 @@ async def test_hybrid_search_ranks_korean_text_when_embeddings_degenerate(
     assert best_lexical.section_title == "Supported File Formats"
     assert best_lexical.lexical_score is not None and best_lexical.lexical_score > 0.5
     assert all(c.lexical_score is None for c in vector_only)
+
+
+async def test_corpora_are_tagged_and_search_can_be_restricted(
+    session_factory, sample_docs_dir, tmp_path
+) -> None:
+    """toy (marker name) + a second folder without a marker (folder name) in one DB."""
+    other = tmp_path / "publicish"
+    other.mkdir()
+    shutil.copy(PUBLIC / "07_irecist_how_to_2020.xml", other)
+    pipeline = _pipeline(session_factory, FakeOllama())
+    await pipeline.run(sample_docs_dir)
+    await pipeline.run(other)
+
+    async with session_factory() as s:
+        corpora = dict((await s.execute(select(Document.file_name, Document.corpus))).all())
+    assert corpora["dicom-upload-guide.md"] == "toy"
+    assert corpora["07_irecist_how_to_2020.xml"] == "publicish"
+
+    query = FakeOllama()
+    vector = (await query.embed(["iRECIST iUPD iCPD confirmation"]))[0]
+    async with session_factory() as s:
+        everything = await search_chunks(s, vector, top_k=200)
+        toy_only = await search_chunks(s, vector, top_k=50, corpus="toy")
+        other_only = await search_chunks(s, vector, top_k=50, corpus="publicish")
+    assert {c.file_name for c in everything} >= {"07_irecist_how_to_2020.xml", "qa-checklist.md"}
+    assert "07_irecist_how_to_2020.xml" not in {c.file_name for c in toy_only}
+    assert {c.file_name for c in other_only} == {"07_irecist_how_to_2020.xml"}
+    assert all(c.page_number is None for c in other_only)
+    assert any("Table" in (c.section_title or "") or c.section_title for c in other_only)

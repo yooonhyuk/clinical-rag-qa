@@ -67,6 +67,7 @@ async def search_chunks(
     query_text: str | None = None,
     rrf_k: int = 60,
     embedding_model: str | None = None,
+    corpus: str | None = None,
 ) -> list[RetrievedChunk]:
     """Vector-only search, or hybrid (vector + pg_trgm, RRF) when `query_text` is given."""
     distance = Chunk.embedding.cosine_distance(query_embedding)
@@ -84,6 +85,8 @@ async def search_chunks(
         stmt = stmt.where(Chunk.file_type == file_type)
     if embedding_model is not None:
         stmt = stmt.where(Chunk.embedding_model == embedding_model)
+    if corpus is not None:
+        stmt = stmt.where(Document.corpus == corpus)
 
     if lexical is None:
         rows = (await session.execute(stmt.order_by(distance).limit(top_k))).all()

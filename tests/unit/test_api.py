@@ -21,9 +21,11 @@ from tests.fakes import FakeOllama, FakeSessionFactory, make_chunk
 class FakePipeline:
     def __init__(self) -> None:
         self.roots: list = []
+        self.corpora: list = []
 
-    async def run(self, root):
+    async def run(self, root, *, corpus=None):
         self.roots.append(root)
+        self.corpora.append(corpus)
         return SimpleNamespace(
             id=uuid.uuid4(),
             status="COMPLETED",
@@ -212,3 +214,22 @@ async def test_dicom_analyze_validates_for_every_sample(settings, factory, name)
     assert body["layer1"]["iod"]["name"]
     for finding in body["layer1"]["findings"] + body["layer2"]["findings"]:
         assert finding["source"]
+
+
+async def test_corpus_is_passed_to_index_and_search(settings, factory) -> None:
+    client, container = _client(settings, factory)
+    seen: list[str | None] = []
+
+    async def search(session, vector, *, top_k, file_type, corpus=None, **_):
+        seen.append(corpus)
+        return [make_chunk("01_fda_imaging_endpoint_2018.pdf", 0.9, page_number=27)]
+
+    container.rag._search = search
+    async with client:
+        await client.post("/api/index", json={"corpus": "public"})
+        body = {"question": "adjudication rate?", "corpus": "public"}
+        ask = await client.post("/api/ask", json=body)
+        await client.post("/api/retrieve", json={"question": "adjudication rate?"})
+    assert container.pipeline.corpora == ["public"]
+    assert seen == ["public", None]  # no corpus = search everything (pre-0005 behaviour)
+    assert ask.json()["sources"][0]["pageNumber"] == 27

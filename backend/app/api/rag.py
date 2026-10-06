@@ -33,6 +33,7 @@ async def ask(body: QuestionRequest, container: ContainerDep, session: SessionDe
         body.question,
         top_k=body.top_k or container.settings.top_k,
         file_type=body.file_type,
+        corpus=body.corpus,
     )
     return AskResponse(
         answer=result.answer,
@@ -63,6 +64,7 @@ async def retrieve(
         body.question,
         top_k=body.top_k or container.settings.top_k,
         file_type=body.file_type,
+        corpus=body.corpus,
     )
     return RetrieveResponse(
         chunks=[

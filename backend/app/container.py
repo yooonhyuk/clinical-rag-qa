@@ -118,5 +118,6 @@ def build_container(
             parse_concurrency=settings.parse_concurrency,
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
+            marker_file=settings.corpus_marker_file,
         ),
     )

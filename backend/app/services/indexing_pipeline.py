@@ -23,6 +23,7 @@ from app.models.base import utcnow
 from app.services.chunker import chunk_sections
 from app.services.document_loader import DiscoveredFile, scan_documents
 from app.services.embedding_service import EmbeddingService
+from app.services.llm_guardrail import corpus_name
 from app.services.llm_types import LLMError
 from app.services.text_extractor import ExtractionError, extract
 
@@ -66,15 +67,20 @@ class IndexingPipeline:
         parse_concurrency: int = 2,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
+        marker_file: str = ".corpus.yaml",
     ) -> None:
         self._session_factory = session_factory
         self._embeddings = embeddings
         self._parse_concurrency = parse_concurrency
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
+        self._marker_file = marker_file
 
-    async def run(self, root: Path) -> IndexJob:
+    async def run(self, root: Path, *, corpus: str | None = None) -> IndexJob:
+        """Index every file under `root`, tagging documents with `corpus` (default: the
+        `.corpus.yaml` name, else the folder name)."""
         files = await asyncio.to_thread(scan_documents, root)
+        corpus = corpus or corpus_name(root, self._marker_file)
 
         async with self._session_factory() as session:
             job = IndexJob(
@@ -97,7 +103,7 @@ class IndexingPipeline:
 
         async def bounded(f: DiscoveredFile) -> FileOutcome:
             async with limiter:
-                return await self._process(f)
+                return await self._process(f, corpus)
 
         status = "COMPLETED"
         try:
@@ -119,9 +125,9 @@ class IndexingPipeline:
             await session.commit()
             return job
 
-    async def _process(self, f: DiscoveredFile) -> FileOutcome:
+    async def _process(self, f: DiscoveredFile, corpus: str | None = None) -> FileOutcome:
         async with self._session_factory() as session:
-            doc, duplicate_of = await self._register(session, f)
+            doc, duplicate_of = await self._register(session, f, corpus)
             if doc is None:
                 return _duplicate(f, duplicate_of)
             try:
@@ -141,7 +147,7 @@ class IndexingPipeline:
                 )
 
     async def _register(
-        self, session: AsyncSession, f: DiscoveredFile
+        self, session: AsyncSession, f: DiscoveredFile, corpus: str | None = None
     ) -> tuple[Document | None, str | None]:
         """Create (or reuse a FAILED / other-model) document row. (None, name) on duplicate.
 
@@ -154,12 +160,16 @@ class IndexingPipeline:
             and existing.status != DocumentStatus.FAILED
             and existing.embedding_model == self._embeddings.model
         ):
+            if corpus is not None and existing.corpus != corpus:
+                existing.corpus = corpus  # e.g. a row indexed before Alembic 0005
+                await session.commit()
             return None, existing.file_name
 
         doc = existing or Document(checksum=f.checksum)
         doc.file_name = f.file_name
         doc.file_path = str(f.path)
         doc.file_type = f.file_type
+        doc.corpus = corpus
         doc.status = DocumentStatus.DISCOVERED
         doc.error_type = None
         doc.error_message = None

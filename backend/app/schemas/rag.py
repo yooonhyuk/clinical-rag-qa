@@ -9,6 +9,8 @@ class QuestionRequest(CamelModel):
     question: str = Field(min_length=1, max_length=2000)
     top_k: int | None = Field(default=None, ge=1, le=20)
     file_type: str | None = Field(default=None, pattern="^(md|txt|pdf|xml|html)$")
+    # Restrict retrieval to one corpus (documents.corpus, e.g. "toy" / "public"). None = all.
+    corpus: str | None = Field(default=None, max_length=100)
 
 
 class SourceOut(CamelModel):

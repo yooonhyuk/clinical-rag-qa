@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import CHAR, DateTime, Integer, Text
+from sqlalchemy import CHAR, DateTime, Index, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
@@ -19,6 +19,7 @@ class DocumentStatus(enum.StrEnum):
 
 class Document(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     __tablename__ = "documents"
+    __table_args__ = (Index("documents_corpus_idx", "corpus"),)
 
     file_name: Mapped[str] = mapped_column(Text)
     file_path: Mapped[str] = mapped_column(Text)
@@ -31,6 +32,9 @@ class Document(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Embedding model of the current chunks; a different configured model triggers re-embedding.
     embedding_model: Mapped[str | None] = mapped_column(Text)
+    # Corpus name (`.corpus.yaml` name:, else folder name): toy / public / private ...
+    # NULL for rows indexed before Alembic 0005. Search can be restricted to one corpus.
+    corpus: Mapped[str | None] = mapped_column(Text)
 
     chunks: Mapped[list["Chunk"]] = relationship(  # noqa: F821
         back_populates="document", cascade="all, delete-orphan", passive_deletes=True

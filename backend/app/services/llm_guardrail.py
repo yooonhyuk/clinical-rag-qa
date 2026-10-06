@@ -41,6 +41,19 @@ def corpus_classification(root: Path, marker_file: str) -> str | None:
     return str(value) if value is not None else None
 
 
+def corpus_name(root: Path, marker_file: str) -> str:
+    """`name:` from the corpus marker, else the folder name (e.g. "public", "originals")."""
+    marker = root / marker_file
+    if marker.is_file():
+        try:
+            data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            data = {}
+        if isinstance(data, dict) and data.get("name"):
+            return str(data["name"])
+    return root.name
+
+
 def ensure_corpus_allows_external(root: Path, marker_file: str) -> None:
     classification = corpus_classification(root, marker_file)
     if classification not in ALLOWED_CLASSIFICATIONS:

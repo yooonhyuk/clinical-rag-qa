@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     raw_docs_path: Path = Path("./data/raw-docs/documents")
     dicom_path: Path = Path("./data/raw-docs/dicom")
     samples_path: Path = Path("./samples")
+    # Repo corpora (corpus/public, ...). Readable by /api/index like samples.
+    corpora_path: Path = Path("./corpus")
     rules_path: Path = _APP_DIR / "rules"
     prompts_path: Path = _APP_DIR / "prompts"
 
@@ -120,7 +122,8 @@ class Settings(BaseSettings):
     @property
     def allowed_roots(self) -> list[Path]:
         """Directories the API is allowed to read from (path traversal guard)."""
-        return [p.resolve() for p in (self.raw_docs_path, self.dicom_path, self.samples_path)]
+        roots = (self.raw_docs_path, self.dicom_path, self.samples_path, self.corpora_path)
+        return [p.resolve() for p in roots]
 
 
 @lru_cache

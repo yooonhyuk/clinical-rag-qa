@@ -126,6 +126,7 @@ class RagService:
         *,
         top_k: int,
         file_type: str | None = None,
+        corpus: str | None = None,
     ) -> tuple[list[RetrievedChunk], int]:
         start = time.perf_counter()
         query_vector = await self._embeddings.embed_query(question)
@@ -137,6 +138,7 @@ class RagService:
             query_text=question if self._hybrid else None,
             rrf_k=self._rrf_k,
             embedding_model=self._embeddings.model,
+            corpus=corpus,
         )
         return chunks, _elapsed_ms(start)
 
@@ -147,6 +149,7 @@ class RagService:
         *,
         top_k: int,
         file_type: str | None = None,
+        corpus: str | None = None,
     ) -> AskResult:
         if is_out_of_scope(question):
             result = self._refusal(
@@ -156,7 +159,7 @@ class RagService:
             return result
 
         retrieved, retrieval_ms = await self.retrieve(
-            session, question, top_k=top_k, file_type=file_type
+            session, question, top_k=top_k, file_type=file_type, corpus=corpus
         )
         evidence = [c for c in retrieved if c.score >= self._min_score]
         if not evidence:

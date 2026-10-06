@@ -26,7 +26,7 @@ async def run_index(container: ContainerDep, body: IndexRequest | None = None) -
             ensure_corpus_allows_external(root, settings.corpus_marker_file)
         except ExternalLLMNotAllowedError as exc:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    job = await container.pipeline.run(root)
+    job = await container.pipeline.run(root, corpus=body.corpus if body else None)
     return IndexResponse(
         job_id=job.id,
         status=job.status,
