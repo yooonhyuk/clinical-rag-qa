@@ -1,6 +1,6 @@
 # 006. 표 chunk 문제: DICOM Table E.1-1 행 chunk가 무관한 질문의 top-5를 차지하고, 작은 표(RANO·RECIL)는 검색되지 않음
 
-- 상태: 미해결 (원인 분석, 수정 방향 정리)
+- 상태: 일부 개선 (선택 기능인 reranker로 답이 있는 질문의 허브 제거·p59 해결, p65 미해결, 2026-10-07)
 - GitHub: https://github.com/yooonhyuk/clinical-rag-qa/issues/7
 - 발견: 2026-10-07, 공개 코퍼스 첫 평가(bge-m3 · 벡터 단독 / 하이브리드)
 - 영향 범위: 표 조회(table_lookup) 문항, 표가 많은 문서가 섞인 코퍼스 전체의 검색
@@ -43,3 +43,19 @@
 - top-k에 문서·섹션 다양성(문서당 상한, MMR)을 둔다.
 - 질문에 "Table N"이 있으면 해당 캡션 chunk를 우선한다.
 - reranker 비교(다음 단계)에서 p59/p65/p68과 허브 현상이 줄어드는지 확인한다.
+
+## 재측정 (2026-10-07, B7 reranker, [ADR 0004](../decisions/0004-reranker.md))
+
+같은 색인, gemma4:e4b, 각 2회(두 실행의 검색 결과는 같음).
+
+| | 벡터 | 벡터 + bge-reranker-v2-m3 |
+|---|---|---|
+| 답이 있는 질문 top-5의 DICOM 표 chunk | 4개 / 3문항 (p40, p72, p74) | **0개** |
+| 거절 대상 질문 top-5의 DICOM 표 chunk | 5개 / 2문항 (p83, p98) | 12개 / 4문항 (p92, p96, p98, p99) |
+| p59 (RECIL Table 1) | 섹션 miss, 거절 | **섹션 hit, 답변** |
+| p65 (RANO Table 3) | 섹션 miss, 거절 | 섹션 miss, 거절 |
+| table_lookup 섹션 hit / 오거절 | 81.8% / 18.2% | 90.9% / 9.1% |
+
+- 무관한 질문(평양냉면, 버블 정렬, 월드컵)에는 여전히 DICOM 표 chunk가 top-5를 채웁니다. 이 질문들은 거절되므로 결과에는 영향이 없지만 허브 현상 자체는 남아 있습니다.
+- p68은 이번 색인에서는 벡터 단독도 정답 문서(RANO)를 찾았습니다. 첫 실행의 "DICOM 표 5개"는 재현되지 않았습니다([이슈 009](009-retrieval-differs-across-reindex.md)).
+- reranker는 기본값이 꺼져 있고(지연 +2.6초, torch·모델 2.3GB), 표 chunk 구조(캡션 반복, 큰 참조표 분리)는 바꾸지 않았으므로 이슈는 열어 둡니다.

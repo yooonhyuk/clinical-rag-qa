@@ -1,6 +1,6 @@
 # 005. ICH E6(R3) 질문이 식약처 ICH GCP 안내서(E6(R2) 국·영문 병기)로 검색됨 — 버전 혼동과 한국어 쏠림
 
-- 상태: 미해결 (원인 분석, 재현 절차, 수정 방향 정리)
+- 상태: 미해결 (reranker로 시도했으나 더 나빠짐, 2026-10-07)
 - GitHub: https://github.com/yooonhyuk/clinical-rag-qa/issues/6
 - 발견: 2026-10-07, 공개 코퍼스 첫 평가(`eval/public_questions.yaml`, bge-m3 · 벡터 단독)
 - 영향 범위: 같은 규정의 여러 판·번역본이 한 코퍼스에 있을 때의 검색과 인용
@@ -48,3 +48,15 @@ make eval EVAL_DATABASE_URL=postgresql+asyncpg://clinical:clinical@localhost:554
 - top-k에 문서 다양성(MMR 또는 문서당 상한)을 둔다.
 - reranker 비교(다음 단계)에서 판 구분이 되는지 이 7문항으로 확인한다.
 - 답변에 인용 문서의 판을 표시해, 사용자가 R2 근거임을 알 수 있게 한다.
+
+## reranker 시도 (2026-10-07, [ADR 0004](../decisions/0004-reranker.md))
+
+같은 색인, gemma4:e4b, 각 2회(검색 결과는 두 실행이 같음). p10~p16 7문항 합계.
+
+| | 벡터 | 벡터 + bge-reranker-v2-m3 |
+|---|---|---|
+| top-5의 R3 chunk / R2 chunk | 9 / 26 | 6 / 28 |
+| 파일 hit / 섹션 hit | 5 / 5 | **3 / 3** |
+
+- cross-encoder는 한국어 질문에 국문 R2 번역 chunk를 더 높게 매겼습니다. p13(영어 질문)과 p15가 hit → miss가 됐고, p13은 거절로 바뀌었습니다.
+- chunk에 문서 판(R2/R3) 정보가 없다는 원인 2는 순위 모델로 해결되지 않습니다. 다음 단계는 그대로 "chunk 머리말에 문서 식별 정보 추가"와 "질문의 판 이름으로 필터/가중치"입니다.

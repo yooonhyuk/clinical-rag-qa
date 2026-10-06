@@ -53,6 +53,7 @@ backend/app/
               dicom_conformance(Layer 1) · dicom_deid(Layer 2) · dicom_findings
               ollama_client · anthropic_client · llm_types · llm_guardrail
               scope_classifier(OUT_OF_SCOPE: 정규식 + bge-m3 kNN)
+              reranker(선택: bge-reranker-v2-m3 cross-encoder, `rerank` extra)
   models/     document chunk dicom_file index_job ask_log (SQLAlchemy 2.0)
   schemas/    Pydantic (camelCase 응답)
   prompts/    rag_prompt.txt dicom_summary_prompt.txt
@@ -63,7 +64,7 @@ backend/alembic/versions/  0001_initial_schema · 0002_ask_log_llm_usage · 0003
                            0004_embedding_model_tracking · 0005_document_corpus
 frontend/streamlit_app.py · no_egress_entrypoint.py (폐쇄망 ui: default route 제거 후 권한 하강)
 eval/       questions.yaml (toy 25문항) · public_questions.yaml (공개 99문항) · scope_heldout.yaml (B6 61문항)
-            eval_metrics.py · run_eval.py · run_scope_eval.py · results/ (날짜·설정·코퍼스 해시별 결과, 커밋함)
+            eval_metrics.py · run_eval.py · run_scope_eval.py · tune_gate.py(rerank 게이트 dev 조정) · results/ (날짜·설정·코퍼스 해시별 결과, 커밋함)
 tests/      unit/ (API 테스트 포함) · integration/ (PostgreSQL + pgvector)
 offline-bundle/  build-bundle.sh · install.sh · verify-offline.sh
 samples/    documents/ (toy 코퍼스: 가상 문서 6종 + .corpus.yaml) · dicom/ (합성 DICOM 9종)
@@ -72,11 +73,14 @@ scripts/    generate_sample_dicom.py · generate_sample_pdf.py · fetch-original
             build_iod_rules.py · build_deid_rules.py · dicom_docbook.py (표준 → 규칙 YAML)
             diagnose_embedding.py (토크나이저/cosine 진단) · reset_embeddings.py
             export_ollama_models.py (번들용: 로컬 Ollama 저장소에서 모델 복사)
-docs/       dicom-rules.md (DICOM 2계층 규칙 설계·출처·한계) · decisions/0001-pdf-library.md (ADR)
+docs/       dicom-rules.md (DICOM 2계층 규칙 설계·출처·한계) · journey.md (문제 → 시도 → 결과 → 교훈)
+docs/decisions/  0001-pdf-library · 0002-embedding-model · 0003-retrieval-mode · 0004-reranker
+                 0005-generator-model (ADR)
 docs/issues/  001-korean-embedding-unk.md · 002-dicom-free-text-phi-to-llm.md
               003-offline-ui-egress.md · 004-compose-host-ollama-and-port-binding.md
               005-ich-version-confusion-cross-language.md · 006-table-chunks-hubs-and-misses.md
-              007-hedged-answers-counted-as-refusals.md
+              007-hedged-answers-counted-as-refusals.md · 008-partial-answer-on-must-refuse.md
+              009-retrieval-differs-across-reindex.md · 010-medgemma-fabricates-no-answer-values.md
 ```
 
 ---
@@ -183,12 +187,17 @@ make eval CORPUS=toy    EVAL_ARGS="--reindex"   # toy 25문항
 make eval CORPUS=public EVAL_ARGS="--reindex --hybrid off"   # 공개 코퍼스 99문항 (벡터 단독)
 make eval CORPUS=public EVAL_ARGS="--hybrid on"              # 같은 색인으로 하이브리드
 make scope-eval                                 # B6: OUT_OF_SCOPE 분류기 held-out 61문항
+# B7 reranker (선택): torch/transformers extra + HF 캐시에 모델(revision 고정)을 미리 받아 둠
+uv sync --project backend --all-groups --extra rerank
+make eval CORPUS=public EVAL_ARGS="--hybrid off --reranker bge-reranker-v2-m3 --rerank-min-score 0"
+make eval CORPUS=public EVAL_ARGS="--hybrid off --generator-model medgemma:4b"   # 생성 모델 비교
 make eval CORPUS=~/clinical-rag-private/originals EVAL_ARGS="--reindex --questions my.yaml"  # 로컬 전용
 ```
 
 - `CORPUS`는 `toy`(`samples/documents`), `public`(`corpus/public`) 또는 폴더 경로입니다. 문서는 코퍼스 이름(`.corpus.yaml`의 `name`)으로 태그되고, 평가는 그 코퍼스 안에서만 검색합니다. 한 DB에 여러 코퍼스를 넣어도 서로 섞이지 않습니다. `CORPUS`를 주지 않으면 MVP-1처럼 `RAW_DOCS_PATH`를 쓰고 코퍼스 필터를 걸지 않습니다.
 - 결과는 `eval/results/<날짜>_<코퍼스>_<설정>_<코퍼스 해시 8자리>/`에 `config.json`(모델·검색 설정·코퍼스/문항 SHA-256·git commit), `summary.json`(전체·유형별·언어별·거절 사유), `questions.jsonl`(문항별 검색·인용 chunk, 답변, 지연), `report.md`로 저장하고 git에 커밋합니다. 로컬 전용 코퍼스의 결과는 커밋하지 않습니다.
-- `--generator-model`(예: `medgemma:4b`)로 생성 모델을, `--scope-classifier`로 OUT_OF_SCOPE 판별 방식을 바꿀 수 있습니다. `--reranker`는 다음 단계용 자리만 있고 지금은 `none`뿐입니다.
+- `--generator-model`(예: `medgemma:4b`)로 생성 모델을, `--scope-classifier`로 OUT_OF_SCOPE 판별 방식을 바꿀 수 있습니다. `--reranker bge-reranker-v2-m3`는 cross-encoder 단계를 켭니다(`--rerank-candidates`, `--rerank-min-score`). `--partial-answers off`는 MVP-1 거절 정책으로 실행합니다. 결과에는 부분 답변 비율과 같은 실행을 MVP-1 정책으로 채점한 값(`legacy_*`), JSON schema 준수율, 한국어 답변 비율이 함께 남습니다.
+- rerank 게이트 임계값은 게이트를 끈 실행(`--rerank-min-score 0`)에서 `eval/tune_gate.py`로 dev 분할(toy 전체 + public 유형별 짝수 번째)에서만 고릅니다. held-out(public 홀수 번째)은 보고용입니다.
 - `make eval`은 호스트에서 실행되고 `EVAL_DATABASE_URL`(기본 `localhost:5432`)과 `EVAL_OLLAMA_URL`에 붙습니다. 아래 수치는 기존 볼륨을 건드리지 않도록 일회용 컨테이너 DB(`pgvector/pgvector:0.8.0-pg16`, `127.0.0.1:55432`, 익명 볼륨)로 만들었습니다.
 
 ---
@@ -245,7 +254,11 @@ make eval CORPUS=~/clinical-rag-private/originals EVAL_ARGS="--reindex --questio
    - bge-m3 kNN: 질문 벡터(검색에 쓰는 것을 재사용)와 `rules/scope_exemplars.yaml`의 예시 80개(거절 35 / 허용 45)의 cosine으로 `점수 = 거절 예시 top-3 평균 − 허용 예시 top-3 평균`을 계산하고, `SCOPE_MARGIN`(0.056) 이상이면 거절합니다. 임계값은 예시만으로 leave-one-out 조정했고 held-out 셋은 쓰지 않았습니다.
    - MVP-1 정규식은 "결절/병변/종양"이 들어가기만 해도 거절해서 "폐결절 AI 임상시험의 판독자 수" 같은 문서 질문을 막았습니다. 기준선으로만 남겨 두었습니다(`SCOPE_CLASSIFIER=mvp1`). 측정 결과는 아래 "B6: 진단·치료 요청 판별"을 참고하세요.
 2. **NO_EVIDENCE**: 검색 결과가 없거나 top-1 cosine score가 `MIN_RELEVANCE_SCORE`(기본 0.45)보다 낮을 때. 프롬프트에는 이 값 이상인 chunk만 넣습니다.
-3. **MODEL_REFUSED**: 모델이 structured output으로 `insufficient_evidence=true`를 돌려줄 때, 인용 없이 "문서에서 확인할 수 없습니다"라고 답할 때, 또는 Provider가 요청을 거절할 때(`stop_reason=refusal`).
+3. **MODEL_REFUSED**: 모델이 structured output으로 `insufficient_evidence=true`를 돌려주면서 유효한 context를 하나도 인용하지 않을 때, 인용 없이 "문서에서 확인할 수 없습니다"라고 답할 때, 또는 Provider가 요청을 거절할 때(`stop_reason=refusal`).
+
+**부분 답변 (`PARTIAL_ANSWERS=true`, 기본값)**: 모델이 `insufficient_evidence=true`를 돌려줬지만 유효한 context를 인용했다면 거절하지 않고 `partial=true`와 `caveat`("문서에서 질문의 일부에 대한 근거만 확인됩니다…")를 붙여 돌려줍니다. 교차 문서 질문에서 "한쪽 문서만 근거가 있는" 답이 거절되던 문제([이슈 007](docs/issues/007-hedged-answers-counted-as-refusals.md))의 대응입니다. 대가로 거절 대상 1문항이 부분 답변으로 나갑니다([이슈 008](docs/issues/008-partial-answer-on-must-refuse.md)).
+
+**reranker (선택, `RERANKER=bge-reranker-v2-m3`)**: cosine top-`RERANK_CANDIDATES`(30)를 cross-encoder로 다시 매겨 top-k를 고르고, 그 k개를 모두 프롬프트에 넣습니다. NO_EVIDENCE는 후보 중 최고 cosine(= 기존 top-1)과 최고 rerank 점수(`RERANK_MIN_SCORE`, 기본 0 = 게이트 없음)로 판단합니다. rerank 점수 게이트는 dev 분할에서 조정했지만 이득이 없어 0으로 두었습니다([ADR 0004](docs/decisions/0004-reranker.md)).
 
 인용은 다음 순서로 정합니다. 모델이 돌려준 `cited_context_ids`를 먼저 쓰고, 없으면 본문의 `[n]` 표기를 파싱하고, 그것도 없으면 프롬프트에 넣은 evidence 전체를 출처로 씁니다(`citationMode`로 구분). 모든 요청은 `ask_logs`에 질문, 검색된 chunk id, 출처, 검색·생성 지연 시간, 거절 사유, provider/model, 토큰 수와 함께 저장합니다.
 
@@ -290,6 +303,7 @@ Ollama와 Claude는 모든 테스트에서 가짜 클라이언트로 대체합�
 
 **실행 결과 (2026-10-06, macOS arm64, Docker 실행 중)**
 
+- 2026-10-07 (B7·#8 반영): `make test` **366 passed** (단위·API 359 + 통합 7). reranker 단계(후보 수·순서·게이트·cosine 게이트 유지, 가짜 reranker), 부분 답변 판정과 `PARTIAL_ANSWERS=false`, API의 `partial`/`caveat`/`rerankScore`, 부분 답변 지표, 게이트 재계산·dev 분할이 추가됐습니다. 실제 torch 모델은 테스트에서 불러오지 않습니다.
 - 2026-10-07 (B5/B6 반영): `make test` **346 passed** (단위·API 339 + 통합 7). 공개 코퍼스 로더(PDF 헤딩·머리말 제거·목차, JATS, HTML 표), 코퍼스 태그·필터(Alembic 0005), OUT_OF_SCOPE 분류기, 평가 지표, 공개 평가셋 근거 문장 검증(79문항)이 추가됐습니다.
 - `make test`: **198 passed, 0 skipped** (단위·API 192 + 통합 6). 통합 테스트는 testcontainers(`pgvector/pgvector:pg16`) 경로로 실행했습니다.
 - 오프라인 번들 단위 테스트(#4, #5) 추가 전: 188 passed (단위·API 182 + 통합 6).
@@ -303,7 +317,32 @@ Ollama와 Claude는 모든 테스트에서 가짜 클라이언트로 대체합�
 
 **실행 환경 (2026-10-07)**: Apple M5, 메모리 32GB, macOS. 호스트 Ollama 0.24.0, embedding `bge-m3`(1024차원), 생성 `gemma4:e4b`(temperature 0.1), 일회용 `pgvector/pgvector:0.8.0-pg16` DB. Provider는 ollama만 실행했습니다(문서 텍스트를 외부 API로 보내지 않음). top_k=5, chunk 1000/150, `MIN_RELEVANCE_SCORE=0.45`, `SCOPE_CLASSIFIER=embedding`(margin 0.056). 결과 원본은 `eval/results/2026-10-07_*`에 있습니다.
 
-### toy vs public 요약
+### 현재 기준: 부분 답변(#8) · reranker(B7) · 생성 모델 비교 (2026-10-07)
+
+public 99문항(답 79 / 거절 20)을 **한 색인**에서 실행했습니다. 각 설정 2회, 칸 안의 두 값은 1회 / 2회입니다. 모든 실행에서 부분 답변 정책이 켜져 있고, 괄호 안 "MVP-1 정책"은 같은 실행을 부분 답변도 거절로 보고 다시 채점한 값입니다. 결과: `eval/results/2026-10-07_public_bge-m3-vector{,-rerank}-{gemma4-e4b,medgemma-4b}*`.
+
+| 지표 | **gemma4 · 벡터 (기본값)** | gemma4 · 벡터 + rerank | medgemma:4b · 벡터 | medgemma:4b · 벡터 + rerank |
+|---|---|---|---|---|
+| hit@5 (파일) | **96.2% / 96.2%** | 94.9% / 94.9% | 96.2% / 96.2% | 94.9% / 94.9% |
+| 섹션/페이지 hit@5 | 87.3% / 87.3% | **88.6% / 88.6%** | 87.3% / 87.3% | 88.6% / 88.6% |
+| Citation accuracy | 86.3% / 87.5% | **88.0% / 88.0%** | 78.2% / 78.2% | 84.8% / 82.3% |
+| Keyword coverage | 91.8% / 93.1% | **94.7% / 96.0%** | 87.2% / 87.2% | 91.1% / 91.1% |
+| Refusal accuracy (20) | **95.0% / 95.0%** (MVP-1 정책 100%) | **95.0% / 95.0%** (100%) | 80.0% / 85.0% | 75.0% / 75.0% |
+| False refusal (79) | 7.6% / 8.9% (MVP-1 정책 15.2% / 17.7%) | 5.1% / 5.1% (8.9%) | 1.3% / 1.3% | 0% / 0% |
+| 부분 답변 (답 있음) | 7.6% / 8.9% | 3.8% / 3.8% | 0% / 0% | 0% / 0% |
+| 한국어로 답한 비율 / 영어 질문 → 한국어 | 94.5% / 86.4% | 94.7% / 95.8% | 66.7% / 26.9% | 69.6% / 25.9% |
+| JSON schema-valid | 100% | 100% | 100% | 100% |
+| 검색 p50 | 112 ms | 2,669~2,723 ms | 110~113 ms | 2,645~2,654 ms |
+| 전체 p50 / p95 | 6.7 / 11.2 s | 9.3 / 14.8 s | 5.7 / 10.0 s | 8.3 / 15.5 s |
+| Ollama 실행 크기 (`ollama ps`) | 10.73GB | 10.73GB (+ reranker MPS 2.3GB) | 4.5GB | 4.5GB (+ 2.3GB) |
+
+- **#8 부분 답변**: 같은 gemma4 · 벡터 실행에서 오거절이 15.2% → 7.6%(2회차 17.7% → 8.9%), 교차 문서 오거절이 57.1% → 14.3%가 됐습니다. 대신 거절 대상 p41 하나가 부분 답변으로 나가 거절 정확도가 95.0%입니다([이슈 008](docs/issues/008-partial-answer-on-must-refuse.md)).
+- **B7 reranker**: 오거절·Keyword·Citation·섹션 hit가 좋아지고(표의 두 번째 열), 답이 있는 질문의 top-5에 들어오던 DICOM 표 chunk가 4개 → 0개, p59(RECIL Table 1)가 풀렸습니다. 반면 파일 hit@5는 1문항 줄고, ICH E6(R3) 문항은 더 나빠졌으며(R3 hit 5 → 3/7, #6), 질문당 약 2.6초가 늘었습니다. torch와 모델 2.3GB가 필요해 **기본값은 꺼 둡니다**([ADR 0004](docs/decisions/0004-reranker.md)). rerank 점수 게이트는 dev에서 사전 목적함수가 0을 골라 쓰지 않습니다(사후 목적함수의 0.56은 held-out 오거절을 7.9% → 15.8%로 만듦, `eval/results/2026-10-07_gate-tuning_bge-reranker-v2-m3/`).
+- **생성 모델**: medgemma:4b는 메모리가 작고 빠르지만 거절 대상 문항에 값을 지어내고(p52 "ICC 0.86", p95 "BICR 최소 30명"), 영어 질문의 약 74%에 영어로 답했습니다. 진단 요청 9문항은 두 모델 모두 100% 거절했지만, 생성 전에 B6 분류기가 막은 결과입니다. **gemma4:e4b를 유지합니다**([ADR 0005](docs/decisions/0005-generator-model.md), [이슈 010](docs/issues/010-medgemma-fabricates-no-answer-values.md)). 라이선스: Gemma 4는 Apache 2.0, MedGemma는 Health AI Developer Foundations 약관(재배포 시 사용 제한 조항·약관 사본·NOTICE 필요).
+- 같은 코퍼스를 새 DB에 다시 색인하자 첫 기준선(아래 표)과 3문항의 top-5가 달라졌습니다(p68 등, hit@5 94.9% → 96.2%). 오늘 만든 두 색인은 서로 같았고 원인은 확정하지 못했습니다([이슈 009](docs/issues/009-retrieval-differs-across-reindex.md)). 위 표의 실행은 모두 같은 색인을 썼습니다.
+- reranker 단독 지연(Apple M5, 질문 1개 × 후보 30개, Ollama 유휴): MPS 512토큰 텍스트 약 3.0초, 짧은 텍스트(약 160토큰) 1.1초 / CPU 짧은 텍스트 2.3초. 모델 로드 3~15초, MPS 할당 2.29GB. 개발 과정은 [docs/journey.md](docs/journey.md)에 정리했습니다.
+
+### toy vs public 요약 (첫 기준선, 부분 답변 정책 이전)
 
 | 지표 | toy · 벡터 | toy · 하이브리드 | **public · 벡터 (기본값)** | public · 하이브리드 |
 |---|---|---|---|---|
@@ -348,7 +387,10 @@ Ollama와 Claude는 모든 테스트에서 가짜 클라이언트로 대체합�
 |---|---|---|
 | [005](docs/issues/005-ich-version-confusion-cross-language.md) ([#6](https://github.com/yooonhyuk/clinical-rag-qa/issues/6)) | ICH E6(R3) 질문이 식약처 ICH GCP 안내서(E6(R2) 국·영문 병기)로 검색됨. p10은 R2 조항을 "E6(R3)에 따르면"으로 답함 | p10~p16 중 6문항의 top-5 다수가 R2 |
 | [006](docs/issues/006-table-chunks-hubs-and-misses.md) ([#7](https://github.com/yooonhyuk/clinical-rag-qa/issues/7)) | DICOM Annex E의 표 행 chunk(문서 167 chunk 대부분)가 허브가 되어 무관한 질문의 top-5를 채우고, RANO·RECIL의 작은 표는 검색되지 않음 | p59, p65, p68, p98 |
-| [007](docs/issues/007-hedged-answers-counted-as-refusals.md) ([#8](https://github.com/yooonhyuk/clinical-rag-qa/issues/8)) | 정답을 인용해 놓고 `insufficient_evidence=true`를 돌려준 부분 답변이 거절로 처리됨. 교차 문서 오거절 57% | p31, p49, p84, p85 |
+| [007](docs/issues/007-hedged-answers-counted-as-refusals.md) ([#8](https://github.com/yooonhyuk/clinical-rag-qa/issues/8)) | 정답을 인용해 놓고 `insufficient_evidence=true`를 돌려준 부분 답변이 거절로 처리됨. 교차 문서 오거절 57% → **부분 답변 정책으로 해결**(오거절 15.2% → 7.6%) | p31, p49, p84, p85 |
+| [008](docs/issues/008-partial-answer-on-must-refuse.md) ([#9](https://github.com/yooonhyuk/clinical-rag-qa/issues/9)) | 부분 답변 정책 뒤 거절 대상 p41(원문이 수치를 `OOmm`로 비운 작성예시)이 부분 답변으로 나감. 거절 정확도 100% → 95% | p41 |
+| [009](docs/issues/009-retrieval-differs-across-reindex.md) ([#10](https://github.com/yooonhyuk/clinical-rag-qa/issues/10)) | 같은 코퍼스를 다시 색인하자 첫 기준선과 top-5가 3문항에서 다름. 원인 미확정 | p68, p95, p98 |
+| [010](docs/issues/010-medgemma-fabricates-no-answer-values.md) ([#11](https://github.com/yooonhyuk/clinical-rag-qa/issues/11)) | medgemma:4b가 거절 대상 문항에 문서에 없는 값을 지어내고 범위 밖 요청에 답함 | p52, p71, p95, p98 |
 
 DICOM 표의 행 조회(태그 → 조치, p76~p82)는 7문항 모두 정확했습니다. 행마다 열 이름을 붙여 "태그 + 조치"가 한 chunk에 남기 때문입니다.
 
@@ -431,7 +473,8 @@ HYBRID_SEARCH=true  make eval
 - **OUT_OF_SCOPE 판별**은 정규식 + 예시 기반 kNN입니다. held-out 61문항에서 재현율 92%, 오거절 2.8%로, 놓치는 요청과 잘못 거절하는 문서 질문이 남아 있습니다(아래 B6 표). 임계값은 bge-m3와 현재 예시에 맞춘 값이라 모델이나 예시를 바꾸면 `make scope-eval`로 다시 정해야 합니다. 2·3단계 거절과 시스템 프롬프트로 한 번 더 막습니다.
 - **chunking**은 섹션 단위(헤딩 번호·JATS `sec`·HTML `h1~h6`)에 문자 수 기준 분할입니다. JATS·HTML 표는 행 단위(`헤더: 값`)로 처리하지만 PDF 표는 구조 없이 텍스트로 들어갑니다. PDF 헤딩은 번호 패턴으로만 찾으므로 번호 없는 소제목(FDA Appendix A의 글머리 소제목 등)은 섹션으로 나뉘지 않고 페이지 번호로만 위치를 표시합니다([ADR 0001](docs/decisions/0001-pdf-library.md)).
 - **공개 평가셋의 한계**: 99문항은 한 사람이 문서를 읽고 쓴 것이고, 질문 표현이 원문 문장과 가까워 실제 사용자 질문보다 쉬울 수 있습니다. 근거 문장 위치는 테스트로 검증하지만 정답 문구(`answer_key`)의 채점은 키워드(`must_include`)와 인용 위치로만 합니다(LLM 채점 없음). 하이브리드는 한 번, 벡터 단독은 두 번 실행했습니다.
-- **다음 단계로 미룬 비교**: reranker, 생성 모델 비교(medgemma:4b), 로컬 전용 원문 코퍼스(`make fetch-originals`) 평가는 아직 실행하지 않았습니다. 공개 코퍼스의 남은 실패는 [이슈 005~007](#공개-코퍼스에서-드러난-실패)에 정리했습니다.
+- **reranker·생성 모델 비교는 Apple M5(MPS) 호스트에서만** 측정했습니다. CPU 전용 linux/amd64 장비의 지연, reranker를 넣은 api 이미지와 오프라인 번들, 새 held-out으로 검증한 rerank 게이트는 아직 없습니다. 기본 생성 모델 gemma4:e4b는 실행 크기가 약 10.7GB라 오프라인 장비(또는 Docker VM)에 12GB 이상 메모리가 필요합니다.
+- **다음 단계로 미룬 비교**: 로컬 전용 원문 코퍼스(`make fetch-originals`) 평가는 아직 실행하지 않았습니다. 공개 코퍼스의 남은 실패는 [이슈 005~010](#공개-코퍼스에서-드러난-실패)에 정리했습니다.
 - `/api/index`는 동기 실행입니다(요청이 인덱싱 완료까지 대기). 목표인 100개 이하 문서에서는 문제없지만, 규모가 커지면 작업 큐(arq 등)가 필요합니다.
 - embedding 차원을 바꾸면 기존 벡터를 모두 지우고 재인덱싱해야 합니다(`make reset-embeddings` → `make index`). 그 사이에는 검색 결과가 비고, `/api/health`가 `embeddingIndex` 불일치로 `degraded`를 보고합니다. 설정한 차원과 모델이 실제로 내는 차원이 다르면 인덱싱은 `EMBEDDING_DIM_MISMATCH`로 실패합니다.
 - anthropic 모드의 가드레일은 "표식이 붙은 폴더만 인덱싱한다"까지 보장합니다. 이전에 ollama 모드로 인덱싱해 DB에 이미 들어 있는 문서까지 검사하지는 않으므로, Provider를 바꿀 때는 DB를 새로 만드는 것을 권장합니다.
