@@ -86,9 +86,10 @@ reset-embeddings:  ## resize chunks.embedding for OLLAMA_EMBEDDING_MODEL and cle
 index:  ## index data/raw-docs/documents through the API
 	curl -s -X POST localhost:8000/api/index -H 'Content-Type: application/json' -d '{}' | python3 -m json.tool
 
-eval:  ## run the RAG eval (needs DB + Ollama reachable; see README). PROVIDERS="ollama anthropic"
+eval:  ## RAG eval -> eval/results/ (DB + Ollama reachable). CORPUS=toy|public|<path> PROVIDERS=ollama
 	DATABASE_URL=$(EVAL_DATABASE_URL) OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) \
-	$(UV) python eval/run_eval.py $(foreach p,$(or $(PROVIDERS),ollama),--provider $(p)) $(EVAL_ARGS)
+	$(UV) python eval/run_eval.py $(foreach p,$(or $(PROVIDERS),ollama),--provider $(p)) \
+	$(if $(CORPUS),--corpus $(CORPUS)) $(EVAL_ARGS)
 
 scope-eval:  ## B6: OUT_OF_SCOPE classifier precision/recall on eval/scope_heldout.yaml (host Ollama)
 	OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) $(UV) python eval/run_scope_eval.py

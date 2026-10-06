@@ -1,23 +1,37 @@
 """RAG evaluation runner (`make eval`).
 
-Runs every question in `eval/questions.yaml` through the real RAG service (in-process, real
-PostgreSQL + pgvector + Ollama embeddings) once per generation provider and writes a Markdown
-report to `eval/reports/<date>-<provider>.md` (+ a side-by-side table when several providers
-are given).
+Runs every question of an eval set through the real RAG service (in-process, real PostgreSQL +
+pgvector + local Ollama) once per generation provider, restricted to one corpus, and writes
 
-    uv run --project backend python eval/run_eval.py             # ollama only
-    uv run --project backend python eval/run_eval.py --reindex   # index RAW_DOCS_PATH first
-    uv run --project backend python eval/run_eval.py --provider ollama --provider anthropic
+    eval/results/<date>_<corpus>_<label>_<corpus-hash>/
+        config.json       run configuration (models, retrieval, corpus hash, git commit)
+        summary.json      overall metrics + by question type + by language + refusal reasons
+        questions.jsonl   one record per question (retrieved/cited chunks, answer, latency)
+        report.md         human-readable report
 
-The anthropic provider only runs when ANTHROPIC_API_KEY is set and the external-LLM guardrail
-passes (ALLOW_EXTERNAL_LLM=true + marked sample corpus); otherwise it is reported as skipped.
-No numbers are ever fabricated: a provider that did not run has no column values.
+Examples:
+
+    uv run --project backend python eval/run_eval.py --corpus toy --reindex
+    uv run --project backend python eval/run_eval.py --corpus public --hybrid off --label vector
+    uv run --project backend python eval/run_eval.py --corpus ~/clinical-rag-private/originals \
+        --questions my_private_questions.yaml          # local only; never commit the results
+
+`--corpus` is `toy` (samples/documents), `public` (corpus/public) or a folder path. The corpus
+name used to filter retrieval comes from the folder's .corpus.yaml `name:` (else the folder
+name). Without `--corpus` the runner behaves like MVP-1: RAW_DOCS_PATH, no corpus filter.
+
+Extension points for the next stage: `--generator-model` swaps the Ollama LLM (e.g.
+medgemma:4b) and `--reranker` is reserved (only `none` is implemented). The anthropic provider
+only runs when ANTHROPIC_API_KEY is set and the external-LLM guardrail passes; otherwise it is
+reported as skipped. No numbers are ever fabricated: a provider that did not run has none.
 """
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -28,19 +42,33 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from eval_metrics import EvalOutcome, EvalQuestion, failed_questions, summarize  # noqa: E402
+from eval_metrics import (  # noqa: E402
+    EvalOutcome,
+    EvalQuestion,
+    failed_questions,
+    refusal_reasons,
+    summarize,
+    summarize_by,
+)
 
 from app.config import get_settings  # noqa: E402
 from app.container import AppContainer, build_container  # noqa: E402
-from app.services.llm_guardrail import ExternalLLMNotAllowedError  # noqa: E402
+from app.services.document_loader import scan_documents  # noqa: E402
+from app.services.llm_guardrail import ExternalLLMNotAllowedError, corpus_name  # noqa: E402
 
-REPORTS = ROOT / "eval" / "reports"
+RESULTS = ROOT / "eval" / "results"
+CORPORA = {"toy": ROOT / "samples" / "documents", "public": ROOT / "corpus" / "public"}
+DEFAULT_QUESTIONS = {
+    "toy": ROOT / "eval" / "questions.yaml",
+    "public": ROOT / "eval" / "public_questions.yaml",
+}
 METRIC_LABELS = {
-    "hit_at_k": "Retrieval hit@k",
-    "section_hit_at_k": "Section hit@k",
-    "citation_correctness": "Citation correctness",
+    "hit_at_k": "Retrieval hit@k (file)",
+    "section_hit_at_k": "Section/page hit@k",
+    "citation_correctness": "Citation accuracy (cited files ⊆ gold)",
+    "citation_location": "Citation location (a cited chunk in gold section/page)",
     "keyword_coverage": "Keyword coverage",
-    "refusal_correctness": "Refusal correctness",
+    "refusal_correctness": "Refusal accuracy (must-refuse)",
     "false_refusal_rate": "False refusal rate (answerable)",
     "retrieval_ms_p50": "Retrieval p50 (ms)",
     "retrieval_ms_p95": "Retrieval p95 (ms)",
@@ -51,27 +79,60 @@ METRIC_LABELS = {
     "input_tokens_total": "Input tokens (total)",
     "output_tokens_total": "Output tokens (total)",
 }
+GROUP_METRICS = (
+    "hit_at_k",
+    "section_hit_at_k",
+    "citation_correctness",
+    "refusal_correctness",
+    "false_refusal_rate",
+    "total_ms_p50",
+)
 
 
 def load_questions(path: Path) -> list[EvalQuestion]:
     return [EvalQuestion.from_dict(q) for q in yaml.safe_load(path.read_text(encoding="utf-8"))]
 
 
-async def run_question(container: AppContainer, q: EvalQuestion, top_k: int) -> EvalOutcome:
+def corpus_hash(root: Path) -> str:
+    """sha256 over (relative path, content sha256) of every supported file, sorted."""
+    digest = hashlib.sha256()
+    for f in scan_documents(root):
+        if f.supported:
+            digest.update(f"{f.path.relative_to(root)}:{f.checksum}\n".encode())
+    return digest.hexdigest()
+
+
+def resolve_corpus(value: str | None) -> tuple[Path | None, str | None]:
+    if value is None:
+        return None, None
+    root = CORPORA.get(value) or Path(value).expanduser().resolve()
+    if not root.is_dir():
+        raise SystemExit(f"corpus folder not found: {root}")
+    return root, corpus_name(root, get_settings().corpus_marker_file)
+
+
+async def run_question(
+    container: AppContainer, q: EvalQuestion, top_k: int, corpus: str | None
+) -> EvalOutcome:
     try:
         async with container.session_factory() as session:
-            r = await container.rag.ask(session, q.question, top_k=top_k)
+            r = await container.rag.ask(session, q.question, top_k=top_k, corpus=corpus)
         retrieved = r.retrieved
         if not retrieved:  # OUT_OF_SCOPE skips retrieval; measure the cosine anyway
             async with container.session_factory() as session:
-                retrieved, _ = await container.rag.retrieve(session, q.question, top_k=top_k)
+                retrieved, _ = await container.rag.retrieve(
+                    session, q.question, top_k=top_k, corpus=corpus
+                )
     except Exception as exc:  # recorded per question, the run continues
         return EvalOutcome(q, [], [], [], "", False, None, 0, 0, error=repr(exc))
     return EvalOutcome(
         question=q,
         retrieved_files=[c.file_name for c in r.retrieved],
         retrieved_sections=[c.section_title for c in r.retrieved],
+        retrieved_pages=[c.page_number for c in r.retrieved],
         cited_files=[c.file_name for c in r.sources],
+        cited_sections=[c.section_title for c in r.sources],
+        cited_pages=[c.page_number for c in r.sources],
         answer=r.answer,
         refused=r.refused,
         refusal_reason=r.refusal_reason,
@@ -83,49 +144,96 @@ async def run_question(container: AppContainer, q: EvalQuestion, top_k: int) -> 
             "citationMode": r.citation_mode,
             # what the NO_EVIDENCE threshold compares against: best cosine among retrieved
             "maxCosine": max((c.score for c in retrieved), default=None),
+            "scope": r.meta.get("scope"),
+            # what retrieval would have returned (also for OUT_OF_SCOPE refusals)
+            "probe": [
+                {"file": c.file_name, "section": c.section_title, "page": c.page_number}
+                for c in retrieved
+            ],
         },
     )
 
 
 async def run_provider(
-    provider: str, questions: list[EvalQuestion], top_k: int, reindex: bool
+    provider: str,
+    questions: list[EvalQuestion],
+    *,
+    top_k: int,
+    root: Path,
+    corpus: str | None,
+    reindex: bool,
+    overrides: dict[str, Any],
 ) -> tuple[list[EvalOutcome], dict[str, Any]]:
-    settings = get_settings().model_copy(update={"llm_provider": provider})
+    settings = get_settings().model_copy(update={"llm_provider": provider, **overrides})
     container = build_container(settings)  # raises ExternalLLMNotAllowedError if not allowed
     try:
         if reindex:
-            job = await container.pipeline.run(settings.raw_docs_path)
+            job = await container.pipeline.run(root, corpus=corpus)
             print(f"[index] indexed={job.indexed} failed={job.failed} dup={job.skipped_duplicate}")
-        outcomes = [await run_question(container, q, top_k) for q in questions]
+        outcomes = []
+        for i, q in enumerate(questions, start=1):
+            outcomes.append(await run_question(container, q, top_k, corpus))
+            o = outcomes[-1]
+            print(f"  [{i}/{len(questions)}] {q.id} {o.refusal_reason or 'ANSWERED'}", flush=True)
         model = settings.anthropic_model if provider == "anthropic" else settings.ollama_llm_model
         config = {
             "provider": provider,
-            "model": model,
+            "generator_model": model,
+            "reranker": overrides.get("_reranker", "none"),
             "embedding_model": settings.ollama_embedding_model,
             "embedding_dim": settings.embedding_dimension,
+            "hybrid_search": settings.hybrid_search,
             "top_k": top_k,
             "chunk_size": settings.chunk_size,
             "chunk_overlap": settings.chunk_overlap,
             "min_relevance_score": settings.min_relevance_score,
-            "hybrid_search": settings.hybrid_search,
+            "scope_classifier": settings.scope_classifier,
+            "scope_margin": settings.scope_margin,
         }
         return outcomes, config
     finally:
         await container.aclose()
 
 
-def _question_row(o: EvalOutcome) -> dict[str, Any]:
-    """Per-question record (used to inspect cosine distributions / refusal thresholds)."""
+def question_record(o: EvalOutcome) -> dict[str, Any]:
+    q = o.question
     return {
-        "id": o.question.id,
-        "answerable": o.question.answerable,
+        "id": q.id,
+        "type": q.qtype,
+        "lang": q.lang,
+        "question": q.question,
+        "answerable": q.answerable,
         "refused": o.refused,
         "refusalReason": o.refusal_reason,
-        "hit": o.hit if o.question.answerable else None,
-        "sectionHit": o.section_hit if o.question.answerable else None,
+        "hit": o.hit if q.answerable else None,
+        "sectionHit": o.section_hit if q.answerable else None,
+        "citationCorrect": o.citation_correct if q.answerable and not o.refused else None,
+        "citationLocated": o.citation_located if q.answerable and not o.refused else None,
         "maxCosine": o.extra.get("maxCosine"),
-        "retrievedFiles": o.retrieved_files,
-        "citedFiles": o.cited_files,
+        "scope": o.extra.get("scope"),
+        "retrieved": [
+            {"file": f, "section": s, "page": p}
+            for f, s, p in zip(
+                o.retrieved_files,
+                o.retrieved_sections,
+                o.retrieved_pages or [None] * len(o.retrieved_files),
+                strict=False,
+            )
+        ],
+        "probe": o.extra.get("probe"),
+        "cited": [
+            {"file": f, "section": s, "page": p}
+            for f, s, p in zip(
+                o.cited_files,
+                o.cited_sections or [None] * len(o.cited_files),
+                o.cited_pages or [None] * len(o.cited_files),
+                strict=False,
+            )
+        ],
+        "answer": o.answer,
+        "answerKey": q.answer_key,
+        "retrievalMs": o.retrieval_ms,
+        "generationMs": o.generation_ms,
         "error": o.error,
     }
 
@@ -138,10 +246,21 @@ def _fmt(key: str, value: Any) -> str:
     return f"{value:.1%}"
 
 
-def render_report(config: dict[str, Any], outcomes: list[EvalOutcome], run_at: str) -> str:
-    summary = summarize(outcomes)
+def _group_table(title: str, groups: dict[str, dict[str, Any]]) -> list[str]:
+    lines = [f"## {title}", "", "| group | n | " + " | ".join(GROUP_METRICS) + " |"]
+    lines.append("|---|---|" + "---|" * len(GROUP_METRICS))
+    for name, s in groups.items():
+        cells = [_fmt(k, s[k]) for k in GROUP_METRICS]
+        lines.append(f"| {name} | {s['questions']} | " + " | ".join(cells) + " |")
+    return [*lines, ""]
+
+
+def render_report(
+    config: dict[str, Any], summary: dict[str, Any], outcomes: list[EvalOutcome]
+) -> str:
+    overall = summary["overall"]
     lines = [
-        f"# RAG Eval Report — {config['provider']} ({run_at})",
+        f"# RAG Eval Report — {config['corpus']} / {config['label']} ({config['run_at']})",
         "",
         "## Config",
         "",
@@ -150,45 +269,52 @@ def render_report(config: dict[str, Any], outcomes: list[EvalOutcome], run_at: s
         "## Metrics",
         "",
         *(
-            [f"> INCOMPLETE: {summary['errors']} question(s) errored; metrics cover the rest", ""]
-            if summary["errors"]
+            [f"> INCOMPLETE: {overall['errors']} question(s) errored; metrics cover the rest", ""]
+            if overall["errors"]
             else []
         ),
         "| Metric | Value |",
         "|---|---|",
-        *(f"| {label} | {_fmt(key, summary[key])} |" for key, label in METRIC_LABELS.items()),
-        f"| Questions / errors | {summary['questions']} / {summary['errors']} |",
+        *(f"| {label} | {_fmt(key, overall[key])} |" for key, label in METRIC_LABELS.items()),
+        f"| Questions (answerable / must-refuse) / errors | {overall['questions']} "
+        f"({overall['answerable']} / {overall['unanswerable']}) / {overall['errors']} |",
         "",
+        f"Refusal reasons: {summary['refusal_reasons']}",
+        "",
+        *_group_table("By question type", summary["by_type"]),
+        *_group_table("By language", summary["by_lang"]),
         "## Failed questions",
         "",
     ]
     failures = failed_questions(outcomes)
     lines += [f"- **{qid}**: {reason}" for qid, reason in failures] or ["- (none)"]
-    lines += ["", "## Per-question", "", "| id | refused | hit | cited | answer (first 80 chars) |"]
-    lines += ["|---|---|---|---|---|"]
+    lines += ["", "## Per-question", ""]
+    lines += ["| id | type | lang | result | hit | sec | cited | answer |"]
+    lines += ["|---|---|---|---|---|---|---|---|"]
     for o in outcomes:
+        q = o.question
         answer = o.answer.replace("\n", " ").replace("|", "/")[:80]
-        cited = ", ".join(sorted(set(o.cited_files))) or "-"
-        hit = "-" if not o.question.answerable else ("Y" if o.hit else "N")
+        cited = ", ".join(sorted({f"{f}" for f in o.cited_files})) or "-"
+        hit = "-" if not q.answerable else ("Y" if o.hit else "N")
+        sec = "-" if not q.answerable else ("Y" if o.section_hit else "N")
         lines.append(
-            f"| {o.question.id} | {o.refusal_reason or '-'} | {hit} | {cited} | {answer} |"
+            f"| {q.id} | {q.qtype} | {q.lang} | {o.refusal_reason or 'ANSWERED'} | {hit} | "
+            f"{sec} | {cited} | {answer} |"
         )
     return "\n".join(lines) + "\n"
 
 
-def render_comparison(results: dict[str, dict[str, Any] | str], run_at: str) -> str:
-    providers = list(results)
-    lines = [
-        f"# RAG Eval — provider comparison ({run_at})",
-        "",
-        "| Metric | " + " | ".join(providers) + " |",
-        "|---|" + "---|" * len(providers),
-    ]
-    for key, label in METRIC_LABELS.items():
-        cells = [_fmt(key, r[key]) if isinstance(r, dict) else "skipped" for r in results.values()]
-        lines.append(f"| {label} | " + " | ".join(cells) + " |")
-    notes = [f"- {p}: {r}" for p, r in results.items() if isinstance(r, str)]
-    return "\n".join(lines + ([""] + notes if notes else [])) + "\n"
+def _git_commit() -> str | None:
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return out.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
 
 
 async def main() -> int:
@@ -198,53 +324,90 @@ async def main() -> int:
     parser.add_argument(
         "--provider", action="append", choices=["ollama", "anthropic"], help="repeatable"
     )
-    parser.add_argument("--questions", type=Path, default=ROOT / "eval" / "questions.yaml")
+    parser.add_argument("--corpus", help="toy | public | <folder path>")
+    parser.add_argument("--questions", type=Path, default=None)
     parser.add_argument("--top-k", type=int, default=None)
-    parser.add_argument("--reindex", action="store_true", help="index RAW_DOCS_PATH first")
+    parser.add_argument("--reindex", action="store_true", help="index the corpus folder first")
+    parser.add_argument("--hybrid", choices=["on", "off"], help="override HYBRID_SEARCH")
+    parser.add_argument("--generator-model", help="override OLLAMA_LLM_MODEL (e.g. medgemma:4b)")
+    parser.add_argument(
+        "--reranker", choices=["none"], default="none", help="reserved for the next stage"
+    )
+    parser.add_argument("--scope-classifier", choices=["embedding", "regex", "mvp1"])
+    parser.add_argument("--label", help="config label used in the result folder name")
+    parser.add_argument("--out", type=Path, default=RESULTS, help="results root")
     args = parser.parse_args()
 
+    root, corpus = resolve_corpus(args.corpus)
+    settings = get_settings()
+    root = root or settings.raw_docs_path
+    questions_path = args.questions or DEFAULT_QUESTIONS.get(
+        args.corpus or "toy", ROOT / "eval" / "questions.yaml"
+    )
+    questions = load_questions(questions_path)
+    top_k = args.top_k or settings.top_k
+    overrides: dict[str, Any] = {}
+    if args.hybrid:
+        overrides["hybrid_search"] = args.hybrid == "on"
+    if args.generator_model:
+        overrides["ollama_llm_model"] = args.generator_model
+    if args.scope_classifier:
+        overrides["scope_classifier"] = args.scope_classifier
     providers = args.provider or ["ollama"]
-    questions = load_questions(args.questions)
-    top_k = args.top_k or get_settings().top_k
-    run_at = datetime.now().strftime("%Y-%m-%d_%H%M")
-    REPORTS.mkdir(parents=True, exist_ok=True)
+    run_at = datetime.now()
+    c_hash = corpus_hash(root)
 
-    results: dict[str, dict[str, Any] | str] = {}
     for i, provider in enumerate(providers):
         if provider == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
-            results[provider] = "skipped: ANTHROPIC_API_KEY not set (no numbers reported)"
-            print(f"[{provider}] {results[provider]}")
+            print(f"[{provider}] skipped: ANTHROPIC_API_KEY not set (no numbers reported)")
             continue
         try:
             outcomes, config = await run_provider(
-                provider, questions, top_k, reindex=args.reindex and i == 0
+                provider,
+                questions,
+                top_k=top_k,
+                root=root,
+                corpus=corpus,
+                reindex=args.reindex and i == 0,
+                overrides=overrides,
             )
         except ExternalLLMNotAllowedError as exc:
-            results[provider] = f"skipped: guardrail — {exc}"
-            print(f"[{provider}] {results[provider]}")
+            print(f"[{provider}] skipped: guardrail — {exc}")
             continue
-        report = render_report(config, outcomes, run_at)
-        path = REPORTS / f"{run_at}-{provider}.md"
-        path.write_text(report, encoding="utf-8")
-        (REPORTS / f"{run_at}-{provider}.json").write_text(
-            json.dumps(summarize(outcomes), indent=2, ensure_ascii=False), encoding="utf-8"
+        hybrid = "hybrid" if config["hybrid_search"] else "vector"
+        label = args.label or f"{config['embedding_model']}-{hybrid}-{config['generator_model']}"
+        label = label.replace(":", "-").replace("/", "-")
+        config = {
+            "run_at": run_at.isoformat(timespec="seconds"),
+            "label": label,
+            "corpus": corpus or "(all, RAW_DOCS_PATH)",
+            "corpus_root": str(root.relative_to(ROOT)) if root.is_relative_to(ROOT) else "local",
+            "corpus_sha256": c_hash,
+            "questions_file": questions_path.name,
+            "questions_sha256": hashlib.sha256(questions_path.read_bytes()).hexdigest(),
+            "git_commit": _git_commit(),
+            **config,
+        }
+        summary = {
+            "overall": summarize(outcomes),
+            "by_type": summarize_by(outcomes, lambda o: o.question.qtype),
+            "by_lang": summarize_by(outcomes, lambda o: o.question.lang),
+            "refusal_reasons": refusal_reasons(outcomes),
+        }
+        stem = f"{run_at:%Y-%m-%d}_{corpus or 'raw'}_{label}_{c_hash[:8]}"
+        out = args.out / stem
+        out.mkdir(parents=True, exist_ok=True)
+        report = render_report(config, summary, outcomes)
+        (out / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+        (out / "summary.json").write_text(
+            json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        (REPORTS / f"{run_at}-{provider}-questions.json").write_text(
-            json.dumps(
-                {"config": config, "questions": [_question_row(o) for o in outcomes]},
-                indent=2,
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-        results[provider] = summarize(outcomes)
+        with (out / "questions.jsonl").open("w", encoding="utf-8") as fh:
+            for o in outcomes:
+                fh.write(json.dumps(question_record(o), ensure_ascii=False) + "\n")
+        (out / "report.md").write_text(report, encoding="utf-8")
         print(report)
-        print(f"[{provider}] report written to {path.relative_to(ROOT)}")
-
-    if len(providers) > 1:
-        path = REPORTS / f"{run_at}-comparison.md"
-        path.write_text(render_comparison(results, run_at), encoding="utf-8")
-        print(path.read_text(encoding="utf-8"))
+        print(f"[{provider}] results written to {out}")
     return 0
 
 
