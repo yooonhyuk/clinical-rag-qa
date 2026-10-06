@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pydicom
 import pytest
 from generate_sample_dicom import build_dataset
+from pydicom.dataset import Dataset
 
 from app.config import Settings
 from app.services.dicom_rules import load_rules
@@ -12,7 +13,7 @@ from app.services.dicom_service import (
     DicomReadError,
     DicomService,
     evaluate,
-    read_dicom_tags,
+    read_dataset,
 )
 from app.services.llm_types import LLMError
 from tests.fakes import FakeOllama
@@ -33,7 +34,7 @@ def test_ct_with_fake_phi_yields_privacy_warnings_and_passes_required(tmp_path, 
     path = _write(
         tmp_path, "ct.dcm", "CT", {"PatientName": "TEST^PATIENT", "StudyDate": "20260101"}
     )
-    result = evaluate(read_dicom_tags(path), rules)
+    result = evaluate(read_dataset(path), rules)
     assert result["missing_required_tags"] == []
     assert "PatientName exists" in result["privacy_warnings"]
     assert "StudyDate exists" in result["privacy_warnings"]
@@ -43,7 +44,7 @@ def test_ct_with_fake_phi_yields_privacy_warnings_and_passes_required(tmp_path, 
 
 def test_phi_and_uid_values_are_never_echoed(tmp_path, rules) -> None:
     path = _write(tmp_path, "ct.dcm", "CT", {"PatientName": "TEST^PATIENT", "PatientID": "FAKE-1"})
-    summary = evaluate(read_dicom_tags(path), rules)["tag_summary"]
+    summary = evaluate(read_dataset(path), rules)["tag_summary"]
     assert summary["PatientName"] == "exists"
     assert summary["PatientID"] == "exists"
     assert summary["StudyInstanceUID"] == "exists"
@@ -55,26 +56,25 @@ def test_mr_missing_tags_are_reported(tmp_path, rules) -> None:
     path = _write(
         tmp_path, "mr.dcm", "MR", {}, omit=("SliceThickness", "ImageOrientationPatient", "Rows")
     )
-    missing = evaluate(read_dicom_tags(path), rules)["missing_required_tags"]
+    missing = evaluate(read_dataset(path), rules)["missing_required_tags"]
     assert missing == ["Rows", "SliceThickness", "ImageOrientationPatient"]
 
 
 def test_modality_specific_rules_do_not_apply_to_cr(rules) -> None:
-    raw = {
-        "StudyInstanceUID": "1",
-        "SeriesInstanceUID": "2",
-        "SOPInstanceUID": "3",
-        "Modality": "CR",
-        "Rows": 10,
-        "Columns": 10,
-    }
-    assert evaluate(raw, rules)["missing_required_tags"] == []
+    ds = Dataset()
+    ds.StudyInstanceUID = "1.2.3"
+    ds.SeriesInstanceUID = "1.2.4"
+    ds.SOPInstanceUID = "1.2.5"
+    ds.Modality = "CR"
+    ds.Rows = 10
+    ds.Columns = 10
+    assert evaluate(ds, rules)["missing_required_tags"] == []
 
 
 def test_pixel_data_is_never_loaded(tmp_path) -> None:
     path = _write(tmp_path, "ct.dcm", "CT", {})
     with patch("app.services.dicom_service.pydicom.dcmread", wraps=pydicom.dcmread) as spy:
-        read_dicom_tags(path)
+        read_dataset(path)
     assert spy.call_args.kwargs["stop_before_pixels"] is True
 
 
@@ -82,7 +82,7 @@ def test_non_dicom_file_raises(tmp_path) -> None:
     path = tmp_path / "fake.dcm"
     path.write_bytes(b"this is a jpg pretending to be dicom")
     with pytest.raises(DicomReadError):
-        read_dicom_tags(path)
+        read_dataset(path)
 
 
 async def test_service_uses_llm_and_appends_disclaimer(sample_dicom, rules) -> None:

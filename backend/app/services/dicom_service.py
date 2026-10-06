@@ -1,7 +1,8 @@
 """DICOM tag analyzer: metadata only, never pixel data, never image reading.
 
 pydicom.dcmread(stop_before_pixels=True) in a worker thread
--> normalize key tags (privacy tags are reduced to "exists", raw PHI never leaves this module)
+-> output allowlist (dicom_safe): only coded/numeric values of allowlisted attributes leave this
+   module; everything else (free text, names, dates, UIDs, private tags) is presence only
 -> rule checks (required / privacy YAML)
 -> LLM explanation (falls back to a deterministic template if Ollama is unavailable)
 """
@@ -13,10 +14,11 @@ from pathlib import Path
 from typing import Any
 
 import pydicom
+from pydicom.dataset import Dataset
 from pydicom.errors import InvalidDicomError
-from pydicom.multival import MultiValue
 
 from app.services.dicom_rules import DicomRules
+from app.services.dicom_safe import EXISTS, SAFE_VALUE_ATTRIBUTES, presence, safe_summary
 from app.services.document_loader import sha256_of
 from app.services.llm_types import GenerationClient, LLMError
 from app.services.prompt_builder import build_dicom_prompt
@@ -37,6 +39,7 @@ KEY_TAGS: tuple[str, ...] = (
     "SeriesDescription",
     "SeriesNumber",
     "SOPInstanceUID",
+    "SOPClassUID",
     "Rows",
     "Columns",
     "PixelSpacing",
@@ -49,8 +52,6 @@ KEY_TAGS: tuple[str, ...] = (
     "PatientSex",
     "AccessionNumber",
 )
-_IDENTIFIER_TAGS = {"StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID"}
-EXISTS = "exists"
 
 
 class DicomReadError(Exception):
@@ -73,91 +74,77 @@ class DicomAnalysis:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
-def _to_jsonable(value: Any) -> Any:
-    if isinstance(value, MultiValue | list | tuple):
-        return [_to_jsonable(v) for v in value]
-    if isinstance(value, bool):
-        return value
-    # DSfloat / IS are float / int subclasses: convert to plain Python types for JSON.
-    if isinstance(value, float):
-        return float(value)
-    if isinstance(value, int):
-        return int(value)
-    return str(value)
+def read_dataset(path: Path) -> Dataset:
+    """Read the DICOM header without loading pixel data. Blocking.
 
-
-def _is_present(value: Any) -> bool:
-    if value is None:
-        return False
-    if isinstance(value, MultiValue | list | tuple):
-        return len(value) > 0
-    return str(value).strip() != ""
-
-
-def read_dicom_tags(path: Path) -> dict[str, Any]:
-    """Read the key tags of a DICOM file without loading pixel data. Blocking."""
+    The returned Dataset holds raw (possibly PHI) values: it must never leave this module
+    except through `dicom_safe` (allowlist) or presence markers.
+    """
     try:
-        ds = pydicom.dcmread(path, stop_before_pixels=True)
+        return pydicom.dcmread(path, stop_before_pixels=True)
     except (InvalidDicomError, OSError, ValueError) as exc:
         raise DicomReadError(f"Cannot read DICOM file: {exc}") from exc
-    raw: dict[str, Any] = {}
-    for keyword in KEY_TAGS:
-        value = ds.get(keyword)
-        if _is_present(value):
-            raw[keyword] = _to_jsonable(value)
-    # Extra privacy-relevant tags that are not part of the summary but must be checked.
-    for keyword in (
-        "InstitutionName",
-        "ReferringPhysicianName",
-        "PerformingPhysicianName",
-        "OperatorsName",
-    ):
-        value = ds.get(keyword)
-        if _is_present(value):
-            raw[keyword] = _to_jsonable(value)
-    return raw
 
 
-def evaluate(raw: dict[str, Any], rules: DicomRules) -> dict[str, Any]:
-    """Pure rule evaluation. `raw` maps tag keyword -> value for tags that are present."""
-    privacy_names = {r.name for r in rules.privacy}
-    tag_summary: dict[str, Any] = {}
-    for keyword in KEY_TAGS:
-        if keyword not in raw:
-            continue
-        if keyword in _IDENTIFIER_TAGS or keyword in privacy_names:
-            tag_summary[keyword] = EXISTS  # never echo identifiers / PHI values
-        else:
-            tag_summary[keyword] = raw[keyword]
-
-    required = rules.required_for(raw.get("Modality"))
-    present_privacy = [r for r in rules.privacy if r.name in raw]
+def evaluate(ds: Dataset, rules: DicomRules) -> dict[str, Any]:
+    """Pure rule evaluation. Only allowlisted values / presence markers are returned."""
+    tag_summary = safe_summary(ds, KEY_TAGS)
+    modality = tag_summary.get("Modality")
+    required = rules.required_for(modality if isinstance(modality, str) else None)
+    present_privacy = [r for r in rules.privacy if presence(ds, r.name) == EXISTS]
     return {
         "tag_summary": tag_summary,
         "privacy_warnings": [f"{r.name} exists" for r in present_privacy],
-        "missing_required_tags": [t for t in required if t not in raw],
-        "passed": [t for t in required if t in raw],
+        "missing_required_tags": [t for t in required if presence(ds, t) != EXISTS],
+        "passed": [t for t in required if presence(ds, t) == EXISTS],
         "warnings": [r.message for r in present_privacy],
     }
+
+
+def build_llm_payload(analysis: DicomAnalysis) -> dict[str, Any]:
+    """The only DICOM-derived data an LLM may see: allowlisted values, presence, rule names."""
+    return {
+        "tagSummary": analysis.tag_summary,
+        "missingRequiredTags": analysis.missing_required_tags,
+        "privacyWarnings": analysis.privacy_warnings,
+        "passed": analysis.passed,
+    }
+
+
+def _value(tags: dict[str, Any], keyword: str) -> Any:
+    """A real (allowlisted) value, or None for presence markers / suppressed values."""
+    value = tags.get(keyword)
+    if (
+        keyword not in SAFE_VALUE_ATTRIBUTES
+        or isinstance(value, str)
+        and value.startswith(("exists", "empty", "absent"))
+    ):
+        return None
+    return value
 
 
 def template_summary(analysis: DicomAnalysis) -> str:
     tags = analysis.tag_summary
     lines: list[str] = []
-    modality = tags.get("Modality")
+    modality = _value(tags, "Modality")
     lines.append(
         f"이 파일은 Modality 태그 기준으로 {modality} 검사 데이터로 보입니다."
         if modality
         else "Modality 태그가 없어 검사 종류를 확인할 수 없습니다."
     )
-    ids = [t for t in ("StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID") if t in tags]
+    ids = [
+        t
+        for t in ("StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID")
+        if tags.get(t) == EXISTS
+    ]
     if len(ids) == 3:
         lines.append("Study/Series/SOP Instance UID가 모두 존재하므로 단위별 추적이 가능합니다.")
     else:
         lines.append(f"식별자 중 {', '.join(ids) or '없음'}만 존재합니다.")
-    if "Rows" in tags and "Columns" in tags:
-        lines.append(f"이미지 크기는 {tags['Rows']} x {tags['Columns']}입니다.")
-    spatial = [t for t in ("PixelSpacing", "SliceThickness") if t in tags]
+    rows, columns = _value(tags, "Rows"), _value(tags, "Columns")
+    if rows is not None and columns is not None:
+        lines.append(f"이미지 크기는 {rows} x {columns}입니다.")
+    spatial = [t for t in ("PixelSpacing", "SliceThickness") if _value(tags, t) is not None]
     if spatial:
         lines.append(f"{', '.join(spatial)} 값이 존재해 기본 공간 정보 확인이 가능합니다.")
     if analysis.missing_required_tags:
@@ -172,15 +159,19 @@ class DicomService:
     def __init__(
         self, llm: GenerationClient | None, rules: DicomRules, *, system_prompt: str
     ) -> None:
-        """`llm=None` => template-only explanations (used when generation is external)."""
-        self._llm = llm
+        """`llm=None` => template-only explanations.
+
+        Defense in depth: DICOM-derived data is never sent to an external provider, even if a
+        caller passes one in (the container already passes None in that case).
+        """
+        self._llm = llm if llm is not None and llm.provider == "ollama" else None
         self._rules = rules
         self._system_prompt = system_prompt
 
     async def analyze(self, path: Path, *, explain: bool = True) -> DicomAnalysis:
-        raw = await asyncio.to_thread(read_dicom_tags, path)
+        ds = await asyncio.to_thread(read_dataset, path)
         checksum = await asyncio.to_thread(sha256_of, path)
-        result = evaluate(raw, self._rules)
+        result = evaluate(ds, self._rules)
         analysis = DicomAnalysis(
             file_name=path.name,
             file_path=str(path),
@@ -193,15 +184,9 @@ class DicomService:
 
     async def _explain(self, analysis: DicomAnalysis, use_llm: bool) -> tuple[str, str]:
         if use_llm and self._llm is not None:
-            payload = {
-                "tagSummary": analysis.tag_summary,
-                "missingRequiredTags": analysis.missing_required_tags,
-                "privacyWarnings": analysis.privacy_warnings,
-                "passed": analysis.passed,
-            }
             try:
                 result = await self._llm.generate(
-                    build_dicom_prompt(payload), system=self._system_prompt
+                    build_dicom_prompt(build_llm_payload(analysis)), system=self._system_prompt
                 )
                 if text := result.text:
                     return f"{text}\n\n{DISCLAIMER}", "llm"

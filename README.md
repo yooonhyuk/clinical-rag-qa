@@ -61,7 +61,7 @@ offline-bundle/  build-bundle.sh · install.sh · verify-offline.sh
 samples/    documents/ (가상 문서 6종 + .corpus.yaml) · dicom/ (합성 DICOM 3종)
 scripts/    generate_sample_dicom.py · generate_sample_pdf.py
             diagnose_embedding.py (토크나이저/cosine 진단) · reset_embeddings.py
-docs/issues/  001-korean-embedding-unk.md
+docs/issues/  001-korean-embedding-unk.md · 002-dicom-free-text-phi-to-llm.md
 ```
 
 ---
@@ -190,7 +190,7 @@ make eval PROVIDERS="ollama anthropic"        # 두 Provider 나란히 비교 (�
 
 - `pydicom.dcmread(path, stop_before_pixels=True)`로 픽셀은 읽지 않습니다. 테스트에서 이 인자가 실제로 넘어가는지 확인합니다.
 - 필수 태그(공통, CT/MR 추가)와 개인정보 가능 태그는 `rules/*.yaml`에 정의합니다.
-- 응답과 DB의 `tags`에는 개인정보 태그와 UID의 **값을 넣지 않고** `"exists"`만 넣습니다. LLM 프롬프트에도 값이 들어가지 않습니다.
+- **출력 allowlist**(`dicom_safe.py`): 응답·DB `tags`·LLM 프롬프트에는 명시적으로 허용한 코드/숫자 값(Modality, Rows/Columns, PixelSpacing, SliceThickness, SOP Class 이름 등)만 들어갑니다. 형식 검사를 통과하지 못한 값과 그 외 모든 속성(이름, 날짜, UID, 설명 같은 자유 텍스트, private tag, sequence)은 `exists` / `empty` / `absent`로만 보고합니다([이슈 002](docs/issues/002-dicom-free-text-phi-to-llm.md)).
 - 설명은 로컬 Gemma가 만들고, Ollama 장애 시에는 결정적 템플릿으로 대체합니다. 응답에는 항상 "영상 판독 아님" 안내 문구를 붙입니다.
 
 ### 선택 기능: Claude API 생성 Provider (opt-in)
