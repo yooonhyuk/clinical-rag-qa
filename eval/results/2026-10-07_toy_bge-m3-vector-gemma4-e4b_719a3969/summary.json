@@ -1,0 +1,75 @@
+{
+  "overall": {
+    "questions": 25,
+    "errors": 0,
+    "answerable": 19,
+    "unanswerable": 6,
+    "hit_at_k": 1.0,
+    "section_hit_at_k": 1.0,
+    "citation_correctness": 0.8947368421052632,
+    "citation_location": 1.0,
+    "keyword_coverage": 0.9736842105263158,
+    "refusal_correctness": 1.0,
+    "false_refusal_rate": 0.0,
+    "retrieval_ms_p50": 99.0,
+    "retrieval_ms_p95": 156.0,
+    "generation_ms_p50": 4384.0,
+    "generation_ms_p95": 8774.0,
+    "total_ms_p50": 4272.0,
+    "total_ms_p95": 8398.8,
+    "input_tokens_total": 19753,
+    "output_tokens_total": 1974
+  },
+  "by_type": {
+    "factual": {
+      "questions": 25,
+      "errors": 0,
+      "answerable": 19,
+      "unanswerable": 6,
+      "hit_at_k": 1.0,
+      "section_hit_at_k": 1.0,
+      "citation_correctness": 0.8947368421052632,
+      "citation_location": 1.0,
+      "keyword_coverage": 0.9736842105263158,
+      "refusal_correctness": 1.0,
+      "false_refusal_rate": 0.0,
+      "retrieval_ms_p50": 99.0,
+      "retrieval_ms_p95": 156.0,
+      "generation_ms_p50": 4384.0,
+      "generation_ms_p95": 8774.0,
+      "total_ms_p50": 4272.0,
+      "total_ms_p95": 8398.8,
+      "input_tokens_total": 19753,
+      "output_tokens_total": 1974
+    }
+  },
+  "by_lang": {
+    "ko": {
+      "questions": 25,
+      "errors": 0,
+      "answerable": 19,
+      "unanswerable": 6,
+      "hit_at_k": 1.0,
+      "section_hit_at_k": 1.0,
+      "citation_correctness": 0.8947368421052632,
+      "citation_location": 1.0,
+      "keyword_coverage": 0.9736842105263158,
+      "refusal_correctness": 1.0,
+      "false_refusal_rate": 0.0,
+      "retrieval_ms_p50": 99.0,
+      "retrieval_ms_p95": 156.0,
+      "generation_ms_p50": 4384.0,
+      "generation_ms_p95": 8774.0,
+      "total_ms_p50": 4272.0,
+      "total_ms_p95": 8398.8,
+      "input_tokens_total": 19753,
+      "output_tokens_total": 1974
+    }
+  },
+  "refusal_reasons": {
+    "ANSWERED": 19,
+    "MODEL_REFUSED": 2,
+    "NO_EVIDENCE": 1,
+    "OUT_OF_SCOPE": 3
+  }
+}

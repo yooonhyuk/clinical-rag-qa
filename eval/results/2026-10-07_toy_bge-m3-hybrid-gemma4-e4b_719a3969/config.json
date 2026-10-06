@@ -1,0 +1,22 @@
+{
+  "run_at": "2026-10-07T00:38:43",
+  "label": "bge-m3-hybrid-gemma4-e4b",
+  "corpus": "toy",
+  "corpus_root": "samples/documents",
+  "corpus_sha256": "719a3969baacdd3013ca04f0646bef35de2180cf9bc092b3b3896eb022031417",
+  "questions_file": "questions.yaml",
+  "questions_sha256": "19e9dfb63fcf82cf5ddc9204c3ab225575fc719d04014630d463538db8720ada",
+  "git_commit": "688b7e2",
+  "provider": "ollama",
+  "generator_model": "gemma4:e4b",
+  "reranker": "none",
+  "embedding_model": "bge-m3",
+  "embedding_dim": 1024,
+  "hybrid_search": true,
+  "top_k": 5,
+  "chunk_size": 1000,
+  "chunk_overlap": 150,
+  "min_relevance_score": 0.45,
+  "scope_classifier": "embedding",
+  "scope_margin": 0.056
+}
