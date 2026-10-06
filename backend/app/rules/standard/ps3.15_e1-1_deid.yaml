@@ -1,0 +1,5143 @@
+# GENERATED FILE - do not edit by hand. Regenerate with:
+#   uv run --project backend python scripts/build_deid_rules.py
+# Source: DICOM PS3.15 2026d, Table E.1-1 / E.1-1a (Application Level Confidentiality Profile)
+#         DICOM PS3.16 2026d, CID 7050 (De-identification Method)
+# URL:    https://dicom.nema.org/medical/dicom/current/source/docbook/part15/part15.xml
+#         https://dicom.nema.org/medical/dicom/current/source/docbook/part16/part16.xml
+# Retrieved: 2026-10-06
+# DICOM(R) is the registered trademark of NEMA for its standards publications.
+generated_by: scripts/build_deid_rules.py
+profile: Basic Application Level Confidentiality Profile (PS3.15 Annex E)
+sources:
+  table_E.1-1:
+    part: PS3.15
+    edition: 2026d
+    url: https://dicom.nema.org/medical/dicom/current/source/docbook/part15/part15.xml
+    retrieved: '2026-10-06'
+    sha256: 1eb2a9724822476b3f1f3de23d15ae655a4c7f6e9d32bf16f2d9ef76d7d8437c
+    table: Table E.1-1
+  table_E.1-1a:
+    part: PS3.15
+    edition: 2026d
+    url: https://dicom.nema.org/medical/dicom/current/source/docbook/part15/part15.xml
+    retrieved: '2026-10-06'
+    sha256: 1eb2a9724822476b3f1f3de23d15ae655a4c7f6e9d32bf16f2d9ef76d7d8437c
+    table: Table E.1-1a
+  cid_7050:
+    part: PS3.16
+    edition: 2026d
+    url: https://dicom.nema.org/medical/dicom/current/source/docbook/part16/part16.xml
+    retrieved: '2026-10-06'
+    sha256: 293912fbc2acefe5d53dffa449070db488134da29aaa452e31d610d403888899
+    table: CID 7050
+action_codes:
+  D: replace with a non-zero length value that may be a dummy value and consistent with the VR
+  Z: replace with a zero length value, or a non-zero length value that may be a dummy value and consistent with the VR
+  X: remove Attribute, and if the Attribute is a Sequence, remove all Sequence Items and their contained Attributes
+  K: keep (unchanged for non-Sequence Attributes, cleaned for Sequences)
+  C: clean, that is replace with values of similar meaning known not to contain identifying information and consistent with
+    the VR
+  U: replace with a non-zero length UID that is internally consistent within a set of Instances
+  Z/D: Z unless D is required to maintain IOD conformance (Type 2 versus Type 1)
+  X/Z: X unless Z is required to maintain IOD conformance (Type 3 versus Type 2)
+  X/D: X unless D is required to maintain IOD conformance (Type 3 versus Type 1)
+  X/Z/D: X unless Z or D is required to maintain IOD conformance (Type 3 versus Type 2 versus Type 1)
+  X/Z/U*: X unless Z or replacement of contained instance UIDs (U) is required to maintain IOD conformance (Type 3 versus
+    Type 2 versus Type 1 sequences containing UID references)
+options:
+  retain_safe_private:
+    name: Retain Safe Private Option
+    cid7050_code: '113111'
+  retain_uids:
+    name: Retain UIDs Option
+    cid7050_code: '113110'
+  retain_device_identity:
+    name: Retain Device Identity Option
+    cid7050_code: '113109'
+  retain_institution_identity:
+    name: Retain Institution Identity Option
+    cid7050_code: '113112'
+  retain_patient_characteristics:
+    name: Retain Patient Characteristics Option
+    cid7050_code: '113108'
+  retain_longitudinal_full_dates:
+    name: Retain Longitudinal Temporal Information Full Dates Option
+    cid7050_code: '113106'
+  retain_longitudinal_modified_dates:
+    name: Retain Longitudinal Temporal Information Modified Dates Option
+    cid7050_code: '113107'
+  clean_descriptors:
+    name: Clean Descriptors Option
+    cid7050_code: '113105'
+  clean_structured_content:
+    name: Clean Structured Content Option
+    cid7050_code: '113104'
+  clean_graphics:
+    name: Clean Graphics Option
+    cid7050_code: '113103'
+cid7050:
+- scheme: DCM
+  code: '113100'
+  meaning: Basic Application Confidentiality Profile
+- scheme: DCM
+  code: '113101'
+  meaning: Clean Pixel Data Option
+- scheme: DCM
+  code: '113102'
+  meaning: Clean Recognizable Visual Features Option
+- scheme: DCM
+  code: '113103'
+  meaning: Clean Graphics Option
+- scheme: DCM
+  code: '113104'
+  meaning: Clean Structured Content Option
+- scheme: DCM
+  code: '113105'
+  meaning: Clean Descriptors Option
+- scheme: DCM
+  code: '113106'
+  meaning: Retain Longitudinal Temporal Information Full Dates Option
+- scheme: DCM
+  code: '113107'
+  meaning: Retain Longitudinal Temporal Information Modified Dates Option
+- scheme: DCM
+  code: '113108'
+  meaning: Retain Patient Characteristics Option
+- scheme: DCM
+  code: '113109'
+  meaning: Retain Device Identity Option
+- scheme: DCM
+  code: '113110'
+  meaning: Retain UIDs Option
+- scheme: DCM
+  code: '113111'
+  meaning: Retain Safe Private Option
+- scheme: DCM
+  code: '113112'
+  meaning: Retain Institution Identity Option
+attributes:
+- name: Accession Number
+  basic: Z
+  tag: 00080050
+  keyword: AccessionNumber
+  retired: false
+  in_std_comp_iod: true
+- name: Acquisition Comments
+  basic: X
+  tag: 00184000
+  keyword: AcquisitionComments
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Acquisition Context Description
+  basic: X
+  tag: '00400556'
+  keyword: AcquisitionContextDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Acquisition Context Sequence
+  basic: X/Z
+  tag: '00400555'
+  keyword: AcquisitionContextSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_structured_content: C
+- name: Acquisition Date
+  basic: X/Z
+  tag: 00080022
+  keyword: AcquisitionDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Acquisition DateTime
+  basic: X/Z/D
+  tag: 0008002A
+  keyword: AcquisitionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Acquisition Device Processing Description
+  basic: X/D
+  tag: 00181400
+  keyword: AcquisitionDeviceProcessingDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Acquisition Field of View Label
+  basic: D
+  tag: 001811BB
+  keyword: AcquisitionFieldOfViewLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Acquisition Protocol Description
+  basic: X
+  tag: 00189424
+  keyword: AcquisitionProtocolDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Acquisition Time
+  basic: X/Z
+  tag: 00080032
+  keyword: AcquisitionTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Acquisition UID
+  basic: U
+  tag: 00080017
+  keyword: AcquisitionUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Actual Human Performers Sequence
+  basic: X
+  tag: '00404035'
+  keyword: ActualHumanPerformersSequence
+  retired: false
+  in_std_comp_iod: false
+- name: Additional Patient History
+  basic: X
+  tag: 001021B0
+  keyword: AdditionalPatientHistory
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Address (Trial)
+  basic: X
+  tag: 0040A353
+  keyword: AddressTrial
+  retired: true
+  in_std_comp_iod: false
+- name: Admission ID
+  basic: X
+  tag: 00380010
+  keyword: AdmissionID
+  retired: false
+  in_std_comp_iod: true
+- name: Admitting Date
+  basic: X
+  tag: 00380020
+  keyword: AdmittingDate
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Admitting Diagnoses Code Sequence
+  basic: X
+  tag: 00081084
+  keyword: AdmittingDiagnosesCodeSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Admitting Diagnoses Description
+  basic: X
+  tag: 00081080
+  keyword: AdmittingDiagnosesDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Admitting Time
+  basic: X
+  tag: 00380021
+  keyword: AdmittingTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Affected SOP Instance UID
+  basic: X
+  tag: '00001000'
+  keyword: AffectedSOPInstanceUID
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Allergies
+  basic: X
+  tag: '00102110'
+  keyword: Allergies
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: C
+    clean_descriptors: C
+- name: Annotation DateTime
+  basic: X
+  tag: 0040B034
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Annotation Group Description
+  basic: X
+  tag: 006A0006
+  keyword: AnnotationGroupDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Annotation Group Label
+  basic: D
+  tag: 006A0005
+  keyword: AnnotationGroupLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Annotation Group UID
+  basic: D
+  tag: 006A0003
+  keyword: AnnotationGroupUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Approval Status DateTime
+  basic: X
+  tag: '00440004'
+  keyword: ApprovalStatusDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Arbitrary
+  basic: X
+  tag: '40000010'
+  keyword: Arbitrary
+  retired: true
+  in_std_comp_iod: false
+- name: Assertion DateTime
+  basic: D
+  tag: '00440104'
+  keyword: AssertionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Assertion Expiration DateTime
+  basic: X
+  tag: '00440105'
+  keyword: AssertionExpirationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Attribute Modification DateTime
+  basic: D
+  tag: '04000562'
+  keyword: AttributeModificationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Author Observer Sequence
+  basic: X
+  tag: 0040A078
+  keyword: AuthorObserverSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Barcode Value
+  basic: X/Z
+  tag: '22000005'
+  keyword: BarcodeValue
+  retired: false
+  in_std_comp_iod: true
+- name: Beam Description
+  basic: X
+  tag: 300A00C3
+  keyword: BeamDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Beam Hold Transition DateTime
+  basic: D
+  tag: 300C0127
+  keyword: BeamHoldTransitionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Bolus Description
+  basic: X
+  tag: 300A00DD
+  keyword: BolusDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Branch of Service
+  basic: X
+  tag: 00101081
+  keyword: BranchOfService
+  retired: false
+  in_std_comp_iod: false
+- name: Calibration Date
+  basic: X
+  tag: 0014407E
+  keyword: CalibrationDate
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Calibration DateTime
+  basic: Z
+  tag: 00181203
+  keyword: CalibrationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Calibration Time
+  basic: X
+  tag: 0014407C
+  keyword: CalibrationTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Camera Owner Name
+  basic: X
+  tag: 0016004D
+  keyword: CameraOwnerName
+  retired: false
+  in_std_comp_iod: true
+- name: Cassette ID
+  basic: X
+  tag: 00181007
+  keyword: CassetteID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Certificate of Signer
+  basic: D
+  tag: '04000115'
+  keyword: CertificateOfSigner
+  retired: false
+  in_std_comp_iod: true
+- name: Certified Timestamp
+  basic: X
+  tag: '04000310'
+  keyword: CertifiedTimestamp
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Channel Derivation Description
+  basic: X
+  tag: 003A020C
+  keyword: ChannelDerivationDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Channel Label
+  basic: X
+  tag: 003A0203
+  keyword: ChannelLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Clinical Trial Coordinating Center Name
+  basic: Z
+  tag: '00120060'
+  keyword: ClinicalTrialCoordinatingCenterName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Clinical Trial Protocol Ethics Committee Approval Number
+  basic: X
+  tag: 00120082
+  keyword: ClinicalTrialProtocolEthicsCommitteeApprovalNumber
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Protocol Ethics Committee Name
+  basic: D
+  tag: 00120081
+  keyword: ClinicalTrialProtocolEthicsCommitteeName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Clinical Trial Protocol ID
+  basic: D
+  tag: '00120020'
+  keyword: ClinicalTrialProtocolID
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Protocol Name
+  basic: Z
+  tag: '00120021'
+  keyword: ClinicalTrialProtocolName
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Series Description
+  basic: X
+  tag: '00120072'
+  keyword: ClinicalTrialSeriesDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Clinical Trial Series ID
+  basic: X
+  tag: '00120071'
+  keyword: ClinicalTrialSeriesID
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Site ID
+  basic: Z
+  tag: '00120030'
+  keyword: ClinicalTrialSiteID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Clinical Trial Site Name
+  basic: Z
+  tag: '00120031'
+  keyword: ClinicalTrialSiteName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Clinical Trial Sponsor Name
+  basic: D
+  tag: '00120010'
+  keyword: ClinicalTrialSponsorName
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Subject ID
+  basic: D
+  tag: '00120040'
+  keyword: ClinicalTrialSubjectID
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Subject Reading ID
+  basic: D
+  tag: '00120042'
+  keyword: ClinicalTrialSubjectReadingID
+  retired: false
+  in_std_comp_iod: true
+- name: Clinical Trial Time Point Description
+  basic: X
+  tag: '00120051'
+  keyword: ClinicalTrialTimePointDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Clinical Trial Time Point ID
+  basic: Z
+  tag: '00120050'
+  keyword: ClinicalTrialTimePointID
+  retired: false
+  in_std_comp_iod: true
+- name: Comments on Radiation Dose
+  basic: X
+  tag: '00400310'
+  keyword: CommentsOnRadiationDose
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Comments on the Performed Procedure Step
+  basic: X
+  tag: 00400280
+  keyword: CommentsOnThePerformedProcedureStep
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Compensator Description
+  basic: X
+  tag: 300A02EB
+  keyword: CompensatorDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Concatenation UID
+  basic: U
+  tag: 00209161
+  keyword: ConcatenationUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Conceptual Volume Combination Description
+  basic: Z
+  tag: 3010000F
+  keyword: ConceptualVolumeCombinationDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Conceptual Volume Description
+  basic: Z
+  tag: '30100017'
+  keyword: ConceptualVolumeDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Conceptual Volume UID
+  basic: U
+  tag: '30100006'
+  keyword: ConceptualVolumeUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Confidentiality Constraint on Patient Data Description
+  basic: X
+  tag: '00403001'
+  keyword: ConfidentialityConstraintOnPatientDataDescription
+  retired: false
+  in_std_comp_iod: false
+- name: Constituent Conceptual Volume UID
+  basic: U
+  tag: '30100013'
+  keyword: ConstituentConceptualVolumeUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Consulting Physician's Name
+  basic: Z
+  tag: 0008009C
+  keyword: ConsultingPhysicianName
+  retired: false
+  in_std_comp_iod: true
+- name: Consulting Physician Identification Sequence
+  basic: X
+  tag: 0008009D
+  keyword: ConsultingPhysicianIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Container Component ID
+  basic: X
+  tag: 0050001B
+  keyword: ContainerComponentID
+  retired: false
+  in_std_comp_iod: true
+- name: Container Description
+  basic: X
+  tag: 0040051A
+  keyword: ContainerDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Container Identifier
+  basic: D
+  tag: '00400512'
+  keyword: ContainerIdentifier
+  retired: false
+  in_std_comp_iod: true
+- name: Content Creator's Identification Code Sequence
+  basic: X
+  tag: 00700086
+  keyword: ContentCreatorIdentificationCodeSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Content Creator's Name
+  basic: Z/D
+  tag: 00700084
+  keyword: ContentCreatorName
+  retired: false
+  in_std_comp_iod: true
+- name: Content Date
+  basic: Z/D
+  tag: 00080023
+  keyword: ContentDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Content Sequence
+  basic: D
+  tag: 0040A730
+  keyword: ContentSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_structured_content: C
+- name: Content Time
+  basic: Z/D
+  tag: 00080033
+  keyword: ContentTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Context Group Local Version
+  basic: D
+  tag: 00080107
+  keyword: ContextGroupLocalVersion
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Context Group Version
+  basic: D
+  tag: 00080106
+  keyword: ContextGroupVersion
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Contrast/Bolus Agent
+  basic: Z/D
+  tag: 00180010
+  keyword: ContrastBolusAgent
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Contrast/Bolus Start Time
+  basic: X
+  tag: 00181042
+  keyword: ContrastBolusStartTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Contrast/Bolus Stop Time
+  basic: X
+  tag: 00181043
+  keyword: ContrastBolusStopTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Contribution DateTime
+  basic: X
+  tag: 0018A002
+  keyword: ContributionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Contribution Description
+  basic: X
+  tag: 0018A003
+  keyword: ContributionDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Country of Residence
+  basic: X
+  tag: '00102150'
+  keyword: CountryOfResidence
+  retired: false
+  in_std_comp_iod: false
+- name: Creation Date
+  basic: X
+  tag: '21000040'
+  keyword: CreationDate
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Creation Time
+  basic: X
+  tag: '21000050'
+  keyword: CreationTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Current Observer (Trial)
+  basic: X
+  tag: 0040A307
+  keyword: CurrentObserverTrial
+  retired: true
+  in_std_comp_iod: false
+- name: Current Patient Location
+  basic: X
+  tag: 00380300
+  keyword: CurrentPatientLocation
+  retired: false
+  in_std_comp_iod: false
+- name: Curve Data
+  basic: X
+  tag: 50xxxxxx
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_graphics: C
+- name: Curve Date
+  basic: X
+  tag: 00080025
+  keyword: CurveDate
+  retired: true
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Curve Time
+  basic: X
+  tag: 00080035
+  keyword: CurveTime
+  retired: true
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Custodial Organization Sequence
+  basic: X
+  tag: 0040A07C
+  keyword: CustodialOrganizationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Data Set Trailing Padding
+  basic: X
+  tag: FFFCFFFC
+  keyword: DataSetTrailingPadding
+  retired: false
+  in_std_comp_iod: true
+- name: Date
+  basic: D
+  tag: 0040A121
+  keyword: Date
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Date of Document or Verbal Transaction (Trial)
+  basic: X
+  tag: 0040A110
+  keyword: DateOfDocumentOrVerbalTransactionTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Date of Installation
+  basic: X
+  tag: 00181205
+  keyword: DateOfInstallation
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Date of Last Calibration
+  basic: X
+  tag: 00181200
+  keyword: DateOfLastCalibration
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Date of Last Detector Calibration
+  basic: X/D
+  tag: 0018700C
+  keyword: DateOfLastDetectorCalibration
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Date of Manufacture
+  basic: X
+  tag: 00181204
+  keyword: DateOfManufacture
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Date of Secondary Capture
+  basic: X
+  tag: 00181012
+  keyword: DateOfSecondaryCapture
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: DateTime
+  basic: D
+  tag: 0040A120
+  keyword: DateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: DateTime of Last Calibration
+  basic: X
+  tag: 00181202
+  keyword: DateTimeOfLastCalibration
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Decay Correction DateTime
+  basic: D
+  tag: 00189701
+  keyword: DecayCorrectionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Decomposition Description
+  basic: X
+  tag: 0018937F
+  keyword: DecompositionDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Derivation Description
+  basic: X
+  tag: 00082111
+  keyword: DerivationDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Destination AE
+  basic: D
+  tag: '21000140'
+  keyword: DestinationAE
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: C
+- name: Detector ID
+  basic: X/D
+  tag: 0018700A
+  keyword: DetectorID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Device Alternate Identifier
+  basic: Z
+  tag: 3010001B
+  keyword: DeviceAlternateIdentifier
+  retired: false
+  in_std_comp_iod: true
+- name: Device Description
+  basic: X
+  tag: '00500020'
+  keyword: DeviceDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Device Label
+  basic: D
+  tag: 3010002D
+  keyword: DeviceLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Device Serial Number
+  basic: X/Z/D
+  tag: 00181000
+  keyword: DeviceSerialNumber
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Device Setting Description
+  basic: X
+  tag: 0016004B
+  keyword: DeviceSettingDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Device UID
+  basic: U
+  tag: 00181002
+  keyword: DeviceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+    retain_device_identity: K
+- name: Digital Signature DateTime
+  basic: D
+  tag: '04000105'
+  keyword: DigitalSignatureDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Digital Signatures Sequence
+  basic: X
+  tag: FFFAFFFA
+  keyword: DigitalSignaturesSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Digital Signature UID
+  basic: U
+  tag: '04000100'
+  keyword: DigitalSignatureUID
+  retired: false
+  in_std_comp_iod: true
+- name: Dimension Organization UID
+  basic: U
+  tag: 00209164
+  keyword: DimensionOrganizationUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Discharge Date
+  basic: X
+  tag: 00380030
+  keyword: DischargeDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Discharge Diagnosis Description
+  basic: X
+  tag: 00380040
+  keyword: DischargeDiagnosisDescription
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Discharge Time
+  basic: X
+  tag: 00380032
+  keyword: DischargeTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Displacement Reference Label
+  basic: X
+  tag: 300A079A
+  keyword: DisplacementReferenceLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Display URI
+  basic: X
+  tag: 0040E012
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Distribution Address
+  basic: X
+  tag: 4008011A
+  keyword: DistributionAddress
+  retired: true
+  in_std_comp_iod: false
+- name: Distribution Name
+  basic: X
+  tag: '40080119'
+  keyword: DistributionName
+  retired: true
+  in_std_comp_iod: false
+- name: Dose Calculation Model Name
+  basic: X
+  tag: 3004007F
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Dose Reference Description
+  basic: X
+  tag: 300A0016
+  keyword: DoseReferenceDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Dose Reference UID
+  basic: U
+  tag: 300A0013
+  keyword: DoseReferenceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Dosimetric Objective UID
+  basic: U
+  tag: 3010006E
+  keyword: DosimetricObjectiveUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Effective DateTime
+  basic: D
+  tag: 00686226
+  keyword: EffectiveDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Effective Start DateTime
+  basic: X
+  tag: 0040A034
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Effective Stop DateTime
+  basic: X
+  tag: 0040A035
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Encapsulated Document
+  basic: D
+  tag: '00420011'
+  keyword: EncapsulatedDocument
+  retired: false
+  in_std_comp_iod: true
+- name: End Acquisition DateTime
+  basic: X/D
+  tag: 00189517
+  keyword: EndAcquisitionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Entity Description
+  basic: X
+  tag: '30100037'
+  keyword: EntityDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Entity Label
+  basic: D
+  tag: '30100035'
+  keyword: EntityLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Entity Long Label
+  basic: D
+  tag: '30100038'
+  keyword: EntityLongLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Entity Name
+  basic: X
+  tag: '30100036'
+  keyword: EntityName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Equipment Frame of Reference Description
+  basic: X
+  tag: 300A0676
+  keyword: EquipmentFrameOfReferenceDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Ethics Committee Approval Effectiveness End Date
+  basic: X
+  tag: 00120087
+  keyword: EthicsCommitteeApprovalEffectivenessEndDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Ethics Committee Approval Effectiveness Start Date
+  basic: X
+  tag: 00120086
+  keyword: EthicsCommitteeApprovalEffectivenessStartDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Ethnic Group
+  basic: X
+  tag: '00102160'
+  keyword: EthnicGroup
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: K
+- name: Ethnic Group Code Sequence
+  basic: X
+  tag: '00102161'
+  keyword: EthnicGroupCodeSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Ethnic Groups
+  basic: X
+  tag: '00102162'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Exclusion Start DateTime
+  basic: D
+  tag: 00189804
+  keyword: ExclusionStartDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Expected Completion DateTime
+  basic: X
+  tag: '00404011'
+  keyword: ExpectedCompletionDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Failed SOP Instance UID List
+  basic: U
+  tag: 00080058
+  keyword: FailedSOPInstanceUIDList
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Fiducial UID
+  basic: U
+  tag: 0070031A
+  keyword: FiducialUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Filler Order Number / Imaging Service Request
+  basic: Z
+  tag: '00402017'
+  keyword: FillerOrderNumberImagingServiceRequest
+  retired: false
+  in_std_comp_iod: true
+- name: Filter Lookup Table Description
+  basic: X
+  tag: 003A032B
+  keyword: FilterLookupTableDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Findings Group Recording Date (Trial)
+  basic: X
+  tag: 0040A023
+  keyword: FindingsGroupRecordingDateTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Findings Group Recording Time (Trial)
+  basic: X
+  tag: 0040A024
+  keyword: FindingsGroupRecordingTimeTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: First Treatment Date
+  basic: X/D
+  tag: '30080054'
+  keyword: FirstTreatmentDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Fixation Device Description
+  basic: X
+  tag: 300A0196
+  keyword: FixationDeviceDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Flow Identifier
+  basic: D
+  tag: '00340002'
+  keyword: FlowIdentifier
+  retired: false
+  in_std_comp_iod: true
+- name: Flow Identifier Sequence
+  basic: D
+  tag: '00340001'
+  keyword: FlowIdentifierSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Fractionation Notes
+  basic: Z
+  tag: 3010007F
+  keyword: FractionationNotes
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Fraction Group Description
+  basic: X
+  tag: 300A0072
+  keyword: FractionGroupDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Frame Acquisition DateTime
+  basic: D
+  tag: 00189074
+  keyword: FrameAcquisitionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Frame Comments
+  basic: X
+  tag: 00209158
+  keyword: FrameComments
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Frame of Reference UID
+  basic: U
+  tag: '00200052'
+  keyword: FrameOfReferenceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Frame Origin Timestamp
+  basic: D
+  tag: '00340007'
+  keyword: FrameOriginTimestamp
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Frame Reference DateTime
+  basic: D
+  tag: 00189151
+  keyword: FrameReferenceDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Functional Sync Pulse
+  basic: D
+  tag: 00189623
+  keyword: FunctionalSyncPulse
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Gantry ID
+  basic: X
+  tag: 00181008
+  keyword: GantryID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Gender Identity Code Sequence
+  basic: X
+  tag: '00100044'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Gender Identity Comment
+  basic: X
+  tag: '00100045'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Gender Identity Sequence
+  basic: X
+  tag: '00100041'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Generator ID
+  basic: X
+  tag: 00181005
+  keyword: GeneratorID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: GPS Altitude
+  basic: X
+  tag: '00160076'
+  keyword: GPSAltitude
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Altitude Ref
+  basic: X
+  tag: '00160075'
+  keyword: GPSAltitudeRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Area Information
+  basic: X
+  tag: 0016008C
+  keyword: GPSAreaInformation
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Date Stamp
+  basic: X
+  tag: 0016008D
+  keyword: GPSDateStamp
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: GPS Dest Bearing
+  basic: X
+  tag: 00160088
+  keyword: GPSDestBearing
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Bearing Ref
+  basic: X
+  tag: 00160087
+  keyword: GPSDestBearingRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Distance
+  basic: X
+  tag: 0016008A
+  keyword: GPSDestDistance
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Distance Ref
+  basic: X
+  tag: 00160089
+  keyword: GPSDestDistanceRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Latitude
+  basic: X
+  tag: 00160084
+  keyword: GPSDestLatitude
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Latitude Ref
+  basic: X
+  tag: 00160083
+  keyword: GPSDestLatitudeRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Longitude
+  basic: X
+  tag: 00160086
+  keyword: GPSDestLongitude
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Dest Longitude Ref
+  basic: X
+  tag: 00160085
+  keyword: GPSDestLongitudeRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Differential
+  basic: X
+  tag: 0016008E
+  keyword: GPSDifferential
+  retired: false
+  in_std_comp_iod: true
+- name: GPS DOP
+  basic: X
+  tag: 0016007B
+  keyword: GPSDOP
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Img Direction
+  basic: X
+  tag: 00160081
+  keyword: GPSImgDirection
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Img Direction Ref
+  basic: X
+  tag: 00160080
+  keyword: GPSImgDirectionRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Latitude
+  basic: X
+  tag: '00160072'
+  keyword: GPSLatitude
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Latitude Ref
+  basic: X
+  tag: '00160071'
+  keyword: GPSLatitudeRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Longitude
+  basic: X
+  tag: '00160074'
+  keyword: GPSLongitude
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Longitude Ref
+  basic: X
+  tag: '00160073'
+  keyword: GPSLongitudeRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Map Datum
+  basic: X
+  tag: 00160082
+  keyword: GPSMapDatum
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Measure Mode
+  basic: X
+  tag: 0016007A
+  keyword: GPSMeasureMode
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Processing Method
+  basic: X
+  tag: 0016008B
+  keyword: GPSProcessingMethod
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Satellites
+  basic: X
+  tag: 00160078
+  keyword: GPSSatellites
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Speed
+  basic: X
+  tag: 0016007D
+  keyword: GPSSpeed
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Speed Ref
+  basic: X
+  tag: 0016007C
+  keyword: GPSSpeedRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Status
+  basic: X
+  tag: 00160079
+  keyword: GPSStatus
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Time Stamp
+  basic: X
+  tag: '00160077'
+  keyword: GPSTimeStamp
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Track
+  basic: X
+  tag: 0016007F
+  keyword: GPSTrack
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Track Ref
+  basic: X
+  tag: 0016007E
+  keyword: GPSTrackRef
+  retired: false
+  in_std_comp_iod: true
+- name: GPS Version ID
+  basic: X
+  tag: '00160070'
+  keyword: GPSVersionID
+  retired: false
+  in_std_comp_iod: true
+- name: Graphic Annotation Sequence
+  basic: D
+  tag: '00700001'
+  keyword: GraphicAnnotationSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_graphics: C
+- name: Hanging Protocol Creation DateTime
+  basic: D
+  tag: 0072000A
+  keyword: HangingProtocolCreationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Hardcopy Creation Device ID
+  basic: X
+  tag: 00181011
+  keyword: HardcopyCreationDeviceID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Histological Diagnoses Code Sequence
+  basic: X
+  tag: 00081304
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: HL7 Document Effective Time
+  basic: X
+  tag: 0040E004
+  keyword: HL7DocumentEffectiveTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Human Performer's Name
+  basic: X
+  tag: '00404037'
+  keyword: HumanPerformerName
+  retired: false
+  in_std_comp_iod: false
+- name: Human Performer's Organization
+  basic: X
+  tag: '00404036'
+  keyword: HumanPerformerOrganization
+  retired: false
+  in_std_comp_iod: false
+- name: Icon Image Sequence (see Note 11)
+  basic: X
+  tag: 00880200
+  keyword: IconImageSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Identifying Comments
+  basic: X
+  tag: 00084000
+  keyword: IdentifyingComments
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Image Comments
+  basic: X
+  tag: '00204000'
+  keyword: ImageComments
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Image Presentation Comments
+  basic: X
+  tag: 00284000
+  keyword: ImagePresentationComments
+  retired: true
+  in_std_comp_iod: false
+- name: Imaging Service Request Comments
+  basic: X
+  tag: '00402400'
+  keyword: ImagingServiceRequestComments
+  retired: false
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Impedance Measurement DateTime
+  basic: D
+  tag: 003A0314
+  keyword: ImpedanceMeasurementDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Impressions
+  basic: X
+  tag: '40080300'
+  keyword: Impressions
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Information Issue DateTime
+  basic: D
+  tag: 00686270
+  keyword: InformationIssueDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Instance Coercion DateTime
+  basic: X
+  tag: 00080015
+  keyword: InstanceCoercionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Instance Creation Date
+  basic: X/D
+  tag: 00080012
+  keyword: InstanceCreationDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Instance Creation Time
+  basic: X/Z/D
+  tag: 00080013
+  keyword: InstanceCreationTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Instance Creator UID
+  basic: U
+  tag: 00080014
+  keyword: InstanceCreatorUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Instance Origin Status
+  basic: X
+  tag: '04000600'
+  keyword: InstanceOriginStatus
+  retired: false
+  in_std_comp_iod: true
+- name: Institution Address
+  basic: X
+  tag: 00080081
+  keyword: InstitutionAddress
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Institutional Department Name
+  basic: X
+  tag: 00081040
+  keyword: InstitutionalDepartmentName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Institutional Department Type Code Sequence
+  basic: X
+  tag: 00081041
+  keyword: InstitutionalDepartmentTypeCodeSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Institution Code Sequence
+  basic: X/Z/D
+  tag: 00080082
+  keyword: InstitutionCodeSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Institution Name
+  basic: X/Z/D
+  tag: 00080080
+  keyword: InstitutionName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Instruction Performed DateTime
+  basic: Z/D
+  tag: 00189919
+  keyword: InstructionPerformedDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Insurance Plan Identification
+  basic: X
+  tag: '00101050'
+  keyword: InsurancePlanIdentification
+  retired: true
+  in_std_comp_iod: false
+- name: Intended Fraction Start Time
+  basic: X
+  tag: '30100085'
+  keyword: IntendedFractionStartTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Intended Phase End Date
+  basic: X/D
+  tag: 3010004D
+  keyword: IntendedPhaseEndDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Intended Phase Start Date
+  basic: X/D
+  tag: 3010004C
+  keyword: IntendedPhaseStartDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Intended Recipients of Results Identification Sequence
+  basic: X
+  tag: '00401011'
+  keyword: IntendedRecipientsOfResultsIdentificationSequence
+  retired: false
+  in_std_comp_iod: false
+- name: Interlock DateTime
+  basic: D
+  tag: 300A0741
+  keyword: InterlockDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Interlock Description
+  basic: D
+  tag: 300A0742
+  keyword: InterlockDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Interlock Origin Description
+  basic: D
+  tag: 300A0783
+  keyword: InterlockOriginDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Interpretation Approval Date
+  basic: X
+  tag: '40080112'
+  keyword: InterpretationApprovalDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Interpretation Approval Time
+  basic: X
+  tag: '40080113'
+  keyword: InterpretationApprovalTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Interpretation Approver Sequence
+  basic: X
+  tag: '40080111'
+  keyword: InterpretationApproverSequence
+  retired: true
+  in_std_comp_iod: false
+- name: Interpretation Author
+  basic: X
+  tag: 4008010C
+  keyword: InterpretationAuthor
+  retired: true
+  in_std_comp_iod: false
+- name: Interpretation Diagnosis Description
+  basic: X
+  tag: '40080115'
+  keyword: InterpretationDiagnosisDescription
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Interpretation ID
+  basic: X
+  tag: '40080200'
+  keyword: InterpretationID
+  retired: true
+  in_std_comp_iod: false
+- name: Interpretation ID Issuer
+  basic: X
+  tag: '40080202'
+  keyword: InterpretationIDIssuer
+  retired: true
+  in_std_comp_iod: false
+- name: Interpretation Recorded Date
+  basic: X
+  tag: '40080100'
+  keyword: InterpretationRecordedDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Interpretation Recorded Time
+  basic: X
+  tag: '40080101'
+  keyword: InterpretationRecordedTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Interpretation Recorder
+  basic: X
+  tag: '40080102'
+  keyword: InterpretationRecorder
+  retired: true
+  in_std_comp_iod: false
+- name: Interpretation Text
+  basic: X
+  tag: 4008010B
+  keyword: InterpretationText
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Interpretation Transcriber
+  basic: X
+  tag: 4008010A
+  keyword: InterpretationTranscriber
+  retired: true
+  in_std_comp_iod: false
+- name: Interpretation Transcription Date
+  basic: X
+  tag: '40080108'
+  keyword: InterpretationTranscriptionDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Interpretation Transcription Time
+  basic: X
+  tag: '40080109'
+  keyword: InterpretationTranscriptionTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Intervention Drug Start Time
+  basic: X
+  tag: 00180035
+  keyword: InterventionDrugStartTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Intervention Drug Stop Time
+  basic: X
+  tag: 00180027
+  keyword: InterventionDrugStopTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Irradiation Event UID
+  basic: U
+  tag: 00083010
+  keyword: IrradiationEventUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Issue Date of Imaging Service Request
+  basic: X
+  tag: '00402004'
+  keyword: IssueDateOfImagingServiceRequest
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Issuer of Admission ID
+  basic: X
+  tag: 00380011
+  keyword: IssuerOfAdmissionID
+  retired: true
+  in_std_comp_iod: true
+- name: Issuer of Admission ID Sequence
+  basic: X
+  tag: 00380014
+  keyword: IssuerOfAdmissionIDSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Clinical Trial Protocol ID
+  basic: X
+  tag: '00120022'
+  keyword: IssuerOfClinicalTrialProtocolID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Clinical Trial Series ID
+  basic: X
+  tag: '00120073'
+  keyword: IssuerOfClinicalTrialSeriesID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Clinical Trial Site ID
+  basic: X
+  tag: '00120032'
+  keyword: IssuerOfClinicalTrialSiteID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Clinical Trial Subject ID
+  basic: X
+  tag: '00120041'
+  keyword: IssuerOfClinicalTrialSubjectID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Clinical Trial Subject Reading ID
+  basic: X
+  tag: '00120043'
+  keyword: IssuerOfClinicalTrialSubjectReadingID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Clinical Trial Time Point ID
+  basic: X
+  tag: '00120055'
+  keyword: IssuerOfClinicalTrialTimePointID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Patient ID
+  basic: X
+  tag: '00100021'
+  keyword: IssuerOfPatientID
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of Service Episode ID
+  basic: X
+  tag: 00380061
+  keyword: IssuerOfServiceEpisodeID
+  retired: true
+  in_std_comp_iod: true
+- name: Issuer of Service Episode ID Sequence
+  basic: X
+  tag: 00380064
+  keyword: IssuerOfServiceEpisodeIDSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of the Container Identifier Sequence
+  basic: Z
+  tag: '00400513'
+  keyword: IssuerOfTheContainerIdentifierSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Issuer of the Specimen Identifier Sequence
+  basic: Z
+  tag: '00400562'
+  keyword: IssuerOfTheSpecimenIdentifierSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Issue Time of Imaging Service Request
+  basic: X
+  tag: '00402005'
+  keyword: IssueTimeOfImagingServiceRequest
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Label Text
+  basic: X/Z
+  tag: '22000002'
+  keyword: LabelText
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Large Palette Color Lookup Table UID
+  basic: U
+  tag: 00281214
+  keyword: LargePaletteColorLookupTableUID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Last Menstrual Date
+  basic: X
+  tag: 001021D0
+  keyword: LastMenstrualDate
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Lens Make
+  basic: X
+  tag: 0016004F
+  keyword: LensMake
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Lens Model
+  basic: X
+  tag: '00160050'
+  keyword: LensModel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Lens Serial Number
+  basic: X
+  tag: '00160051'
+  keyword: LensSerialNumber
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Lens Specification
+  basic: X
+  tag: 0016004E
+  keyword: LensSpecification
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Long Device Description
+  basic: X
+  tag: '00500021'
+  keyword: LongDeviceDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: MAC
+  basic: X
+  tag: '04000404'
+  keyword: MAC
+  retired: false
+  in_std_comp_iod: true
+- name: Maker Note
+  basic: X
+  tag: 0016002B
+  keyword: MakerNote
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Manufacturer's Device Class UID
+  basic: U
+  tag: 0018100B
+  keyword: ManufacturerDeviceClassUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+    retain_device_identity: K
+- name: Manufacturer's Device Identifier
+  basic: Z
+  tag: '30100043'
+  keyword: ManufacturerDeviceIdentifier
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Media Storage SOP Instance UID
+  basic: U
+  tag: '00020003'
+  keyword: MediaStorageSOPInstanceUID
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Medical Alerts
+  basic: X
+  tag: '00102000'
+  keyword: MedicalAlerts
+  retired: false
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Medical Record Locator
+  basic: X
+  tag: 00101090
+  keyword: MedicalRecordLocator
+  retired: true
+  in_std_comp_iod: false
+- name: Military Rank
+  basic: X
+  tag: 00101080
+  keyword: MilitaryRank
+  retired: false
+  in_std_comp_iod: false
+- name: Modified Attributes Sequence
+  basic: X
+  tag: '04000550'
+  keyword: ModifiedAttributesSequence
+  retired: false
+  in_std_comp_iod: false
+- name: Modified Image Date
+  basic: X
+  tag: '00203403'
+  keyword: ModifiedImageDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Modified Image Description
+  basic: X
+  tag: '00203406'
+  keyword: ModifiedImageDescription
+  retired: true
+  in_std_comp_iod: false
+- name: Modified Image Time
+  basic: X
+  tag: '00203405'
+  keyword: ModifiedImageTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Modifying Device ID
+  basic: X
+  tag: '00203401'
+  keyword: ModifyingDeviceID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Modifying System
+  basic: D
+  tag: '04000563'
+  keyword: ModifyingSystem
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Montage Channel Label
+  basic: X
+  tag: 0040B03F
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Montage Name
+  basic: X
+  tag: 0040B03B
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Most Recent Treatment Date
+  basic: X/D
+  tag: '30080056'
+  keyword: MostRecentTreatmentDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Multi-energy Acquisition Description
+  basic: X
+  tag: 0018937B
+  keyword: MultienergyAcquisitionDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Multiplex Group Label
+  basic: X
+  tag: 003A0020
+  keyword: MultiplexGroupLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Multiplex Group UID
+  basic: U
+  tag: 003A0310
+  keyword: MultiplexGroupUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Name of Physician(s) Reading Study
+  basic: X
+  tag: 00081060
+  keyword: NameOfPhysiciansReadingStudy
+  retired: false
+  in_std_comp_iod: true
+- name: Names of Intended Recipients of Results
+  basic: X
+  tag: '00401010'
+  keyword: NamesOfIntendedRecipientsOfResults
+  retired: false
+  in_std_comp_iod: false
+- name: Name to Use
+  basic: X
+  tag: '00100012'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Name to Use Comment
+  basic: X
+  tag: '00100013'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Network ID
+  basic: X
+  tag: 00081000
+  keyword: NetworkID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Nonconforming Data Element Value
+  basic: X
+  tag: '04000552'
+  keyword: NonconformingDataElementValue
+  retired: false
+  in_std_comp_iod: false
+- name: Nonconforming Modified Attributes Sequence
+  basic: X
+  tag: '04000551'
+  keyword: NonconformingModifiedAttributesSequence
+  retired: false
+  in_std_comp_iod: false
+- name: Observation Date (Trial)
+  basic: X
+  tag: 0040A192
+  keyword: ObservationDateTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Observation DateTime
+  basic: X/D
+  tag: 0040A032
+  keyword: ObservationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Observation Start DateTime
+  basic: X
+  tag: 0040A033
+  keyword: ObservationStartDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Observation Subject UID (Trial)
+  basic: U
+  tag: 0040A402
+  keyword: ObservationSubjectUIDTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Observation Time (Trial)
+  basic: X
+  tag: 0040A193
+  keyword: ObservationTimeTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Observation UID
+  basic: U
+  tag: 0040A171
+  keyword: ObservationUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Occupation
+  basic: X
+  tag: 00102180
+  keyword: Occupation
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Operator Identification Sequence
+  basic: X/D
+  tag: 00081072
+  keyword: OperatorIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Operators' Name
+  basic: X/Z/D
+  tag: 00081070
+  keyword: OperatorsName
+  retired: false
+  in_std_comp_iod: true
+- name: Order Callback Phone Number
+  basic: X
+  tag: '00402010'
+  keyword: OrderCallbackPhoneNumber
+  retired: false
+  in_std_comp_iod: false
+- name: Order Callback Telecom Information
+  basic: X
+  tag: '00402011'
+  keyword: OrderCallbackTelecomInformation
+  retired: false
+  in_std_comp_iod: false
+- name: Order Entered By
+  basic: X
+  tag: 00402008
+  keyword: OrderEnteredBy
+  retired: false
+  in_std_comp_iod: false
+- name: Order Enterer's Location
+  basic: X
+  tag: 00402009
+  keyword: OrderEntererLocation
+  retired: false
+  in_std_comp_iod: false
+- name: Original Attributes Sequence
+  basic: X
+  tag: '04000561'
+  keyword: OriginalAttributesSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Originator
+  basic: X
+  tag: '21000070'
+  keyword: Originator
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Other Clinical Trial Protocol IDs Sequence
+  basic: X
+  tag: '00120023'
+  keyword: OtherClinicalTrialProtocolIDsSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Other Patient IDs
+  basic: X
+  tag: '00101000'
+  keyword: OtherPatientIDs
+  retired: true
+  in_std_comp_iod: true
+- name: Other Patient IDs Sequence
+  basic: X
+  tag: '00101002'
+  keyword: OtherPatientIDsSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Other Patient Names
+  basic: X
+  tag: '00101001'
+  keyword: OtherPatientNames
+  retired: false
+  in_std_comp_iod: true
+- name: Overlay Comments
+  basic: X
+  tag: 60xx4000
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_graphics: C
+- name: Overlay Data
+  basic: X
+  tag: 60xx3000
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_graphics: C
+- name: Overlay Date
+  basic: X
+  tag: 00080024
+  keyword: OverlayDate
+  retired: true
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Overlay Time
+  basic: X
+  tag: 00080034
+  keyword: OverlayTime
+  retired: true
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Override DateTime
+  basic: D
+  tag: 300A0760
+  keyword: OverrideDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Palette Color Lookup Table UID
+  basic: U
+  tag: 00281199
+  keyword: PaletteColorLookupTableUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Participant Sequence
+  basic: X
+  tag: 0040A07A
+  keyword: ParticipantSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Participation DateTime
+  basic: Z
+  tag: 0040A082
+  keyword: ParticipationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Patient's Address
+  basic: X
+  tag: '00101040'
+  keyword: PatientAddress
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Age
+  basic: X
+  tag: '00101010'
+  keyword: PatientAge
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Patient's Birth Date
+  basic: Z
+  tag: '00100030'
+  keyword: PatientBirthDate
+  retired: false
+  in_std_comp_iod: true
+- name: Patient's Birth Name
+  basic: X
+  tag: '00101005'
+  keyword: PatientBirthName
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Birth Time
+  basic: X
+  tag: '00100032'
+  keyword: PatientBirthTime
+  retired: false
+  in_std_comp_iod: true
+- name: Patient's Institution Residence
+  basic: X
+  tag: 00380400
+  keyword: PatientInstitutionResidence
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Insurance Plan Code Sequence
+  basic: X
+  tag: '00100050'
+  keyword: PatientInsurancePlanCodeSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Patient's Mother's Birth Name
+  basic: X
+  tag: '00101060'
+  keyword: PatientMotherBirthName
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Name
+  basic: Z
+  tag: '00100010'
+  keyword: PatientName
+  retired: false
+  in_std_comp_iod: true
+- name: Patient's Primary Language Code Sequence
+  basic: X
+  tag: '00100101'
+  keyword: PatientPrimaryLanguageCodeSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Patient's Primary Language Modifier Code Sequence
+  basic: X
+  tag: '00100102'
+  keyword: PatientPrimaryLanguageModifierCodeSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Patient's Religious Preference
+  basic: X
+  tag: 001021F0
+  keyword: PatientReligiousPreference
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Sex
+  basic: Z
+  tag: '00100040'
+  keyword: PatientSex
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Patient's Sex Neutered
+  basic: X/Z
+  tag: '00102203'
+  keyword: PatientSexNeutered
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Patient's Size
+  basic: X
+  tag: '00101020'
+  keyword: PatientSize
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Patient's Telecom Information
+  basic: X
+  tag: '00102155'
+  keyword: PatientTelecomInformation
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Telephone Numbers
+  basic: X
+  tag: '00102154'
+  keyword: PatientTelephoneNumbers
+  retired: false
+  in_std_comp_iod: false
+- name: Patient's Weight
+  basic: X
+  tag: '00101030'
+  keyword: PatientWeight
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Patient Comments
+  basic: X
+  tag: '00104000'
+  keyword: PatientComments
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Patient ID
+  basic: Z/D
+  tag: '00100020'
+  keyword: PatientID
+  retired: false
+  in_std_comp_iod: true
+- name: Patient Setup Photo Description
+  basic: X
+  tag: 300A0794
+  keyword: PatientSetupPhotoDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Patient Setup UID
+  basic: U
+  tag: 300A0650
+  keyword: PatientSetupUID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Patient State
+  basic: X
+  tag: 00380500
+  keyword: PatientState
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: C
+    clean_descriptors: C
+- name: Patient Transport Arrangements
+  basic: X
+  tag: '00401004'
+  keyword: PatientTransportArrangements
+  retired: false
+  in_std_comp_iod: false
+- name: Patient Treatment Preparation Method Description
+  basic: X
+  tag: 300A0792
+  keyword: PatientTreatmentPreparationMethodDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Patient Treatment Preparation Procedure Parameter Description
+  basic: X
+  tag: 300A078E
+  keyword: PatientTreatmentPreparationProcedureParameterDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Performed Location
+  basic: X
+  tag: '00400243'
+  keyword: PerformedLocation
+  retired: false
+  in_std_comp_iod: false
+- name: Performed Procedure Step Description
+  basic: X
+  tag: '00400254'
+  keyword: PerformedProcedureStepDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Performed Procedure Step End Date
+  basic: X
+  tag: '00400250'
+  keyword: PerformedProcedureStepEndDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Performed Procedure Step End DateTime
+  basic: X
+  tag: '00404051'
+  keyword: PerformedProcedureStepEndDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Performed Procedure Step End Time
+  basic: X
+  tag: '00400251'
+  keyword: PerformedProcedureStepEndTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Performed Procedure Step ID
+  basic: X
+  tag: '00400253'
+  keyword: PerformedProcedureStepID
+  retired: false
+  in_std_comp_iod: true
+- name: Performed Procedure Step Start Date
+  basic: X
+  tag: '00400244'
+  keyword: PerformedProcedureStepStartDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Performed Procedure Step Start DateTime
+  basic: X
+  tag: '00404050'
+  keyword: PerformedProcedureStepStartDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Performed Procedure Step Start Time
+  basic: X
+  tag: '00400245'
+  keyword: PerformedProcedureStepStartTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Performed Station AE Title
+  basic: X
+  tag: '00400241'
+  keyword: PerformedStationAETitle
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Performed Station Geographic Location Code Sequence
+  basic: X
+  tag: '00404030'
+  keyword: PerformedStationGeographicLocationCodeSequence
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Performed Station Name
+  basic: X
+  tag: '00400242'
+  keyword: PerformedStationName
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Performed Station Name Code Sequence
+  basic: X
+  tag: 00404028
+  keyword: PerformedStationNameCodeSequence
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Performing Physician's Name
+  basic: X
+  tag: 00081050
+  keyword: PerformingPhysicianName
+  retired: false
+  in_std_comp_iod: true
+- name: Performing Physician Identification Sequence
+  basic: X
+  tag: 00081052
+  keyword: PerformingPhysicianIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Person's Address
+  basic: X
+  tag: '00401102'
+  keyword: PersonAddress
+  retired: false
+  in_std_comp_iod: true
+- name: Person's Telecom Information
+  basic: X
+  tag: '00401104'
+  keyword: PersonTelecomInformation
+  retired: false
+  in_std_comp_iod: true
+- name: Person's Telephone Numbers
+  basic: X
+  tag: '00401103'
+  keyword: PersonTelephoneNumbers
+  retired: false
+  in_std_comp_iod: true
+- name: Person Identification Code Sequence
+  basic: D
+  tag: '00401101'
+  keyword: PersonIdentificationCodeSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Person Name
+  basic: D
+  tag: 0040A123
+  keyword: PersonName
+  retired: false
+  in_std_comp_iod: true
+- name: Person Names to Use Sequence
+  basic: X
+  tag: '00100011'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Physician(s) of Record
+  basic: X
+  tag: 00081048
+  keyword: PhysiciansOfRecord
+  retired: false
+  in_std_comp_iod: true
+- name: Physician(s) of Record Identification Sequence
+  basic: X
+  tag: 00081049
+  keyword: PhysiciansOfRecordIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Physician(s) Reading Study Identification Sequence
+  basic: X
+  tag: 00081062
+  keyword: PhysiciansReadingStudyIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Physician Approving Interpretation
+  basic: X
+  tag: '40080114'
+  keyword: PhysicianApprovingInterpretation
+  retired: true
+  in_std_comp_iod: false
+- name: Placer Order Number / Imaging Service Request
+  basic: Z
+  tag: '00402016'
+  keyword: PlacerOrderNumberImagingServiceRequest
+  retired: false
+  in_std_comp_iod: true
+- name: Plate ID
+  basic: X
+  tag: 00181004
+  keyword: PlateID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Position Acquisition Template Description
+  basic: X
+  tag: '30020123'
+  keyword: PositionAcquisitionTemplateDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Position Acquisition Template Name
+  basic: X
+  tag: '30020121'
+  keyword: PositionAcquisitionTemplateName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Pregnancy Status
+  basic: X
+  tag: 001021C0
+  keyword: PregnancyStatus
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: K
+- name: Pre-Medication
+  basic: X
+  tag: '00400012'
+  keyword: PreMedication
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: C
+- name: Prescription Description
+  basic: X
+  tag: 300A000E
+  keyword: PrescriptionDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Prescription Notes
+  basic: Z
+  tag: 3010007B
+  keyword: PrescriptionNotes
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Prescription Notes Sequence
+  basic: Z
+  tag: '30100081'
+  keyword: PrescriptionNotesSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Presentation Creation Date
+  basic: X
+  tag: 00700082
+  keyword: PresentationCreationDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Presentation Creation Time
+  basic: X
+  tag: 00700083
+  keyword: PresentationCreationTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Presentation Display Collection UID
+  basic: U
+  tag: '00701101'
+  keyword: PresentationDisplayCollectionUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Presentation Sequence Collection UID
+  basic: U
+  tag: '00701102'
+  keyword: PresentationSequenceCollectionUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Primary Diagnosis Code Sequence
+  basic: X
+  tag: 00081302
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Principal Diagnosis Code Sequence
+  basic: X
+  tag: 00081301
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Prior Treatment Dose Description
+  basic: X
+  tag: '30100061'
+  keyword: PriorTreatmentDoseDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Private Attributes
+  basic: X
+  tag: private
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_safe_private: C
+- name: Procedure Step Cancellation DateTime
+  basic: X
+  tag: '00404052'
+  keyword: ProcedureStepCancellationDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Product Expiration DateTime
+  basic: X
+  tag: 0044000B
+  keyword: ProductExpirationDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Pronoun Code Sequence
+  basic: X
+  tag: '00100015'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Pronoun Comment
+  basic: X
+  tag: '00100016'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Protocol Name
+  basic: X/D
+  tag: 00181030
+  keyword: ProtocolName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Pyramid Description
+  basic: X
+  tag: 00081088
+  keyword: PyramidDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Pyramid Label
+  basic: X
+  tag: '00200027'
+  keyword: PyramidLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Pyramid UID
+  basic: U
+  tag: 00080019
+  keyword: PyramidUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Radiation Dose Identification Label
+  basic: D
+  tag: 300A0619
+  keyword: RadiationDoseIdentificationLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Radiation Dose In-Vivo Measurement Label
+  basic: D
+  tag: 300A0623
+  keyword: RadiationDoseInVivoMeasurementLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Radiation Generation Mode Description
+  basic: Z
+  tag: 300A067D
+  keyword: RadiationGenerationModeDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Radiation Generation Mode Label
+  basic: D
+  tag: 300A067C
+  keyword: RadiationGenerationModeLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Radiopharmaceutical Start DateTime
+  basic: X
+  tag: 00181078
+  keyword: RadiopharmaceuticalStartDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Radiopharmaceutical Start Time
+  basic: X
+  tag: 00181072
+  keyword: RadiopharmaceuticalStartTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Radiopharmaceutical Stop DateTime
+  basic: X
+  tag: 00181079
+  keyword: RadiopharmaceuticalStopDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Radiopharmaceutical Stop Time
+  basic: X
+  tag: 00181073
+  keyword: RadiopharmaceuticalStopTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Reason for Omission Description
+  basic: X
+  tag: 300C0113
+  keyword: ReasonForOmissionDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Reason for Requested Procedure Code Sequence
+  basic: X
+  tag: 0040100A
+  keyword: ReasonForRequestedProcedureCodeSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Reason for Study
+  basic: X
+  tag: '00321030'
+  keyword: ReasonForStudy
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Reason for Superseding
+  basic: Z
+  tag: 3010005C
+  keyword: ReasonForSuperseding
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Reason for the Attribute Modification
+  basic: D
+  tag: '04000565'
+  keyword: ReasonForTheAttributeModification
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Reason for the Imaging Service Request
+  basic: X
+  tag: '00402001'
+  keyword: ReasonForTheImagingServiceRequest
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Reason for the Requested Procedure
+  basic: X
+  tag: '00401002'
+  keyword: ReasonForTheRequestedProcedure
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Reason for Visit
+  basic: X
+  tag: '00321066'
+  keyword: ReasonForVisit
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Reason for Visit Code Sequence
+  basic: X
+  tag: '00321067'
+  keyword: ReasonForVisitCodeSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Receiving AE
+  basic: X
+  tag: '00741234'
+  keyword: ReceivingAE
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Recorded RT Control Point DateTime
+  basic: D
+  tag: 300A073A
+  keyword: RecordedRTControlPointDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Referenced Conceptual Volume UID
+  basic: U
+  tag: 3010000B
+  keyword: ReferencedConceptualVolumeUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced DateTime
+  basic: D
+  tag: 0040A13A
+  keyword: ReferencedDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Referenced Digital Signature Sequence
+  basic: X
+  tag: '04000402'
+  keyword: ReferencedDigitalSignatureSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Referenced Dose Reference UID
+  basic: U
+  tag: 300A0083
+  keyword: ReferencedDoseReferenceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced Dosimetric Objective UID
+  basic: U
+  tag: 3010006F
+  keyword: ReferencedDosimetricObjectiveUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced Fiducials UID
+  basic: U
+  tag: '30100031'
+  keyword: ReferencedFiducialsUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced Frame of Reference UID
+  basic: U
+  tag: '30060024'
+  keyword: ReferencedFrameOfReferenceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced General Purpose Scheduled Procedure Step Transaction UID
+  basic: U
+  tag: '00404023'
+  keyword: ReferencedGeneralPurposeScheduledProcedureStepTransactionUID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Referenced Image Sequence
+  basic: X/Z/U*
+  tag: 00081140
+  keyword: ReferencedImageSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced Observation UID (Trial)
+  basic: U
+  tag: 0040A172
+  keyword: ReferencedObservationUIDTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Referenced Patient Alias Sequence
+  basic: X
+  tag: 00380004
+  keyword: ReferencedPatientAliasSequence
+  retired: true
+  in_std_comp_iod: false
+- name: Referenced Patient Photo Sequence
+  basic: X
+  tag: '00101100'
+  keyword: ReferencedPatientPhotoSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Referenced Patient Sequence
+  basic: X
+  tag: 00081120
+  keyword: ReferencedPatientSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced Performed Procedure Step Sequence
+  basic: X/Z/D
+  tag: 00081111
+  keyword: ReferencedPerformedProcedureStepSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced SOP Instance MAC Sequence
+  basic: X
+  tag: '04000403'
+  keyword: ReferencedSOPInstanceMACSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Referenced SOP Instance UID
+  basic: U
+  tag: 00081155
+  keyword: ReferencedSOPInstanceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced SOP Instance UID in File
+  basic: U
+  tag: '00041511'
+  keyword: ReferencedSOPInstanceUIDInFile
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Referenced Study Sequence
+  basic: X/Z
+  tag: 00081110
+  keyword: ReferencedStudySequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referenced Treatment Position Group UID
+  basic: U
+  tag: 300A0785
+  keyword: ReferencedTreatmentPositionGroupUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Referring Physician's Address
+  basic: X
+  tag: 00080092
+  keyword: ReferringPhysicianAddress
+  retired: false
+  in_std_comp_iod: false
+- name: Referring Physician's Name
+  basic: Z
+  tag: 00080090
+  keyword: ReferringPhysicianName
+  retired: false
+  in_std_comp_iod: true
+- name: Referring Physician's Telephone Numbers
+  basic: X
+  tag: 00080094
+  keyword: ReferringPhysicianTelephoneNumbers
+  retired: false
+  in_std_comp_iod: false
+- name: Referring Physician Identification Sequence
+  basic: X
+  tag: 00080096
+  keyword: ReferringPhysicianIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Region of Residence
+  basic: X
+  tag: '00102152'
+  keyword: RegionOfResidence
+  retired: false
+  in_std_comp_iod: false
+- name: Related Frame of Reference UID
+  basic: U
+  tag: 300600C2
+  keyword: RelatedFrameOfReferenceUID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Request Attributes Sequence
+  basic: X
+  tag: '00400275'
+  keyword: RequestAttributesSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Requested Contrast Agent
+  basic: X
+  tag: '00321070'
+  keyword: RequestedContrastAgent
+  retired: false
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Requested Procedure Comments
+  basic: X
+  tag: '00401400'
+  keyword: RequestedProcedureComments
+  retired: false
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Requested Procedure Description
+  basic: X/Z
+  tag: '00321060'
+  keyword: RequestedProcedureDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Requested Procedure ID
+  basic: X
+  tag: '00401001'
+  keyword: RequestedProcedureID
+  retired: false
+  in_std_comp_iod: false
+- name: Requested Procedure Location
+  basic: X
+  tag: '00401005'
+  keyword: RequestedProcedureLocation
+  retired: false
+  in_std_comp_iod: false
+- name: Requested Series Description
+  basic: X
+  tag: 00189937
+  keyword: RequestedSeriesDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Requested SOP Instance UID
+  basic: U
+  tag: '00001001'
+  keyword: RequestedSOPInstanceUID
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Requesting AE
+  basic: X
+  tag: '00741236'
+  keyword: RequestingAE
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Requesting Physician
+  basic: X
+  tag: '00321032'
+  keyword: RequestingPhysician
+  retired: false
+  in_std_comp_iod: false
+- name: Requesting Service
+  basic: X
+  tag: '00321033'
+  keyword: RequestingService
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Respiratory Motion Compensation Technique Description
+  basic: X
+  tag: 00189185
+  keyword: RespiratoryMotionCompensationTechniqueDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Responsible Organization
+  basic: X
+  tag: 00102299
+  keyword: ResponsibleOrganization
+  retired: false
+  in_std_comp_iod: true
+- name: Responsible Person
+  basic: X
+  tag: 00102297
+  keyword: ResponsiblePerson
+  retired: false
+  in_std_comp_iod: true
+- name: Results Comments
+  basic: X
+  tag: '40084000'
+  keyword: ResultsComments
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Results Distribution List Sequence
+  basic: X
+  tag: '40080118'
+  keyword: ResultsDistributionListSequence
+  retired: true
+  in_std_comp_iod: false
+- name: Results ID
+  basic: X
+  tag: '40080040'
+  keyword: ResultsID
+  retired: true
+  in_std_comp_iod: false
+- name: Results ID Issuer
+  basic: X
+  tag: '40080042'
+  keyword: ResultsIDIssuer
+  retired: true
+  in_std_comp_iod: false
+- name: Retrieve AE Title
+  basic: X
+  tag: 00080054
+  keyword: RetrieveAETitle
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: C
+- name: Review Date
+  basic: Z
+  tag: 300E0004
+  keyword: ReviewDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Reviewer Name
+  basic: X/Z
+  tag: 300E0008
+  keyword: ReviewerName
+  retired: false
+  in_std_comp_iod: true
+- name: Review Time
+  basic: Z
+  tag: 300E0005
+  keyword: ReviewTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: ROI Creator Sequence
+  basic: X
+  tag: 3006004D
+  keyword: ROICreatorSequence
+  retired: false
+  in_std_comp_iod: true
+- name: ROI DateTime
+  basic: X
+  tag: 3006002D
+  keyword: ROIDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: ROI Description
+  basic: X
+  tag: '30060028'
+  keyword: ROIDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: ROI Generation Description
+  basic: X
+  tag: '30060038'
+  keyword: ROIGenerationDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: ROI Interpreter
+  basic: Z
+  tag: 300600A6
+  keyword: ROIInterpreter
+  retired: false
+  in_std_comp_iod: true
+- name: ROI Interpreter Sequence
+  basic: X
+  tag: 3006004E
+  keyword: ROIInterpreterSequence
+  retired: false
+  in_std_comp_iod: true
+- name: ROI Name
+  basic: Z
+  tag: '30060026'
+  keyword: ROIName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: ROI Observation DateTime
+  basic: X
+  tag: 3006002E
+  keyword: ROIObservationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: ROI Observation Description
+  basic: X
+  tag: '30060088'
+  keyword: ROIObservationDescription
+  retired: true
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: ROI Observation Label
+  basic: X
+  tag: '30060085'
+  keyword: ROIObservationLabel
+  retired: true
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Accessory Device Slot ID
+  basic: Z
+  tag: 300A0615
+  keyword: RTAccessoryDeviceSlotID
+  retired: false
+  in_std_comp_iod: true
+- name: RT Accessory Holder Slot ID
+  basic: Z
+  tag: 300A0611
+  keyword: RTAccessoryHolderSlotID
+  retired: false
+  in_std_comp_iod: true
+- name: RT Physician Intent Narrative
+  basic: Z
+  tag: 3010005A
+  keyword: RTPhysicianIntentNarrative
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Plan Date
+  basic: X/D
+  tag: 300A0006
+  keyword: RTPlanDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: RT Plan Description
+  basic: X
+  tag: 300A0004
+  keyword: RTPlanDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Plan Label
+  basic: D
+  tag: 300A0002
+  keyword: RTPlanLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Plan Name
+  basic: X
+  tag: 300A0003
+  keyword: RTPlanName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Plan Time
+  basic: X/D
+  tag: 300A0007
+  keyword: RTPlanTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: RT Prescription Label
+  basic: D
+  tag: '30100054'
+  keyword: RTPrescriptionLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Tolerance Set Label
+  basic: D
+  tag: 300A062A
+  keyword: RTToleranceSetLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Treatment Approach Label
+  basic: X/D
+  tag: '30100056'
+  keyword: RTTreatmentApproachLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: RT Treatment Phase UID
+  basic: U
+  tag: 3010003B
+  keyword: RTTreatmentPhaseUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Safe Position Exit Date
+  basic: D
+  tag: '30080162'
+  keyword: SafePositionExitDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Safe Position Exit Time
+  basic: D
+  tag: '30080164'
+  keyword: SafePositionExitTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Safe Position Return Date
+  basic: D
+  tag: '30080166'
+  keyword: SafePositionReturnDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Safe Position Return Time
+  basic: D
+  tag: '30080168'
+  keyword: SafePositionReturnTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Admission Date
+  basic: X
+  tag: 0038001A
+  keyword: ScheduledAdmissionDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Admission Time
+  basic: X
+  tag: 0038001B
+  keyword: ScheduledAdmissionTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Discharge Date
+  basic: X
+  tag: 0038001C
+  keyword: ScheduledDischargeDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Discharge Time
+  basic: X
+  tag: 0038001D
+  keyword: ScheduledDischargeTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Human Performers Sequence
+  basic: X
+  tag: '00404034'
+  keyword: ScheduledHumanPerformersSequence
+  retired: false
+  in_std_comp_iod: false
+- name: Scheduled Patient Institution Residence
+  basic: X
+  tag: 0038001E
+  keyword: ScheduledPatientInstitutionResidence
+  retired: true
+  in_std_comp_iod: false
+- name: Scheduled Performing Physician's Name
+  basic: X
+  tag: '00400006'
+  keyword: ScheduledPerformingPhysicianName
+  retired: false
+  in_std_comp_iod: false
+- name: Scheduled Performing Physician Identification Sequence
+  basic: X
+  tag: 0040000B
+  keyword: ScheduledPerformingPhysicianIdentificationSequence
+  retired: false
+  in_std_comp_iod: false
+- name: Scheduled Procedure Step Description
+  basic: X
+  tag: '00400007'
+  keyword: ScheduledProcedureStepDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Scheduled Procedure Step End Date
+  basic: X
+  tag: '00400004'
+  keyword: ScheduledProcedureStepEndDate
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Procedure Step End Time
+  basic: X
+  tag: '00400005'
+  keyword: ScheduledProcedureStepEndTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Procedure Step Expiration DateTime
+  basic: X
+  tag: 00404008
+  keyword: ScheduledProcedureStepExpirationDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Procedure Step ID
+  basic: X
+  tag: 00400009
+  keyword: ScheduledProcedureStepID
+  retired: false
+  in_std_comp_iod: true
+- name: Scheduled Procedure Step Location
+  basic: X
+  tag: '00400011'
+  keyword: ScheduledProcedureStepLocation
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Scheduled Procedure Step Modification DateTime
+  basic: X
+  tag: '00404010'
+  keyword: ScheduledProcedureStepModificationDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Procedure Step Start Date
+  basic: X
+  tag: '00400002'
+  keyword: ScheduledProcedureStepStartDate
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Procedure Step Start DateTime
+  basic: X
+  tag: '00404005'
+  keyword: ScheduledProcedureStepStartDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Procedure Step Start Time
+  basic: X
+  tag: '00400003'
+  keyword: ScheduledProcedureStepStartTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Station AE Title
+  basic: X
+  tag: '00400001'
+  keyword: ScheduledStationAETitle
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Scheduled Station Geographic Location Code Sequence
+  basic: X
+  tag: '00404027'
+  keyword: ScheduledStationGeographicLocationCodeSequence
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Scheduled Station Name
+  basic: X
+  tag: '00400010'
+  keyword: ScheduledStationName
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Scheduled Station Name Code Sequence
+  basic: X
+  tag: '00404025'
+  keyword: ScheduledStationNameCodeSequence
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Scheduled Study Location
+  basic: X
+  tag: '00321020'
+  keyword: ScheduledStudyLocation
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: K
+- name: Scheduled Study Location AE Title
+  basic: X
+  tag: '00321021'
+  keyword: ScheduledStudyLocationAETitle
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_device_identity: C
+- name: Scheduled Study Start Date
+  basic: X
+  tag: '00321000'
+  keyword: ScheduledStudyStartDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Study Start Time
+  basic: X
+  tag: '00321001'
+  keyword: ScheduledStudyStartTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Study Stop Date
+  basic: X
+  tag: '00321010'
+  keyword: ScheduledStudyStopDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Scheduled Study Stop Time
+  basic: X
+  tag: '00321011'
+  keyword: ScheduledStudyStopTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Secondary Capture Device ID
+  basic: X
+  tag: 00181010
+  keyword: SecondaryCaptureDeviceID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Secondary Diagnoses Code Sequence
+  basic: X
+  tag: 00081303
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Segment Definition DateTime
+  basic: X
+  tag: 0040B036
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Selector AE Value
+  basic: D
+  tag: 0072005E
+  keyword: SelectorAEValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: C
+- name: Selector AS Value
+  basic: D
+  tag: 0072005F
+  keyword: SelectorASValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Selector DA Value
+  basic: D
+  tag: '00720061'
+  keyword: SelectorDAValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Selector DT Value
+  basic: D
+  tag: '00720063'
+  keyword: SelectorDTValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Selector LO Value
+  basic: D
+  tag: '00720066'
+  keyword: SelectorLOValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Selector LT Value
+  basic: D
+  tag: 00720068
+  keyword: SelectorLTValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Selector OB Value
+  basic: D
+  tag: '00720065'
+  keyword: SelectorOBValue
+  retired: false
+  in_std_comp_iod: true
+- name: Selector PN Value
+  basic: D
+  tag: 0072006A
+  keyword: SelectorPNValue
+  retired: false
+  in_std_comp_iod: true
+- name: Selector SH Value
+  basic: D
+  tag: 0072006C
+  keyword: SelectorSHValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Selector ST Value
+  basic: D
+  tag: 0072006E
+  keyword: SelectorSTValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Selector TM Value
+  basic: D
+  tag: 0072006B
+  keyword: SelectorTMValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Selector UN Value
+  basic: D
+  tag: 0072006D
+  keyword: SelectorUNValue
+  retired: false
+  in_std_comp_iod: true
+- name: Selector UR Value
+  basic: D
+  tag: '00720071'
+  keyword: SelectorURValue
+  retired: false
+  in_std_comp_iod: true
+- name: Selector UT Value
+  basic: D
+  tag: '00720070'
+  keyword: SelectorUTValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Series Date
+  basic: X/D
+  tag: 00080021
+  keyword: SeriesDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Series Description
+  basic: X
+  tag: 0008103E
+  keyword: SeriesDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Series Instance UID
+  basic: U
+  tag: 0020000E
+  keyword: SeriesInstanceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Series Time
+  basic: X/D
+  tag: 00080031
+  keyword: SeriesTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Service Episode Description
+  basic: X
+  tag: 00380062
+  keyword: ServiceEpisodeDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Service Episode ID
+  basic: X
+  tag: 00380060
+  keyword: ServiceEpisodeID
+  retired: false
+  in_std_comp_iod: true
+- name: Setup Technique Description
+  basic: X
+  tag: 300A01B2
+  keyword: SetupTechniqueDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Sex Parameters for Clinical Use Category Code Sequence
+  basic: X
+  tag: '00100046'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Sex Parameters for Clinical Use Category Comment
+  basic: X
+  tag: '00100042'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: C
+    clean_descriptors: C
+- name: Sex Parameters for Clinical Use Category Reference
+  basic: X
+  tag: '00100047'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Sex Parameters for Clinical Use Category Sequence
+  basic: X
+  tag: '00100043'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_patient_characteristics: K
+- name: Shielding Device Description
+  basic: X
+  tag: 300A01A6
+  keyword: ShieldingDeviceDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Slide Identifier
+  basic: X
+  tag: 004006FA
+  keyword: SlideIdentifier
+  retired: true
+  in_std_comp_iod: false
+- name: Smoking Status
+  basic: X
+  tag: 001021A0
+  keyword: SmokingStatus
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: K
+- name: SOP Authorization DateTime
+  basic: X
+  tag: '01000420'
+  keyword: SOPAuthorizationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: SOP Instance UID
+  basic: U
+  tag: 00080018
+  keyword: SOPInstanceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Source Conceptual Volume UID
+  basic: U
+  tag: '30100015'
+  keyword: SourceConceptualVolumeUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Source End DateTime
+  basic: D
+  tag: 0018936A
+  keyword: SourceEndDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Source Frame of Reference UID
+  basic: U
+  tag: '00640003'
+  keyword: SourceFrameOfReferenceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Source Identifier
+  basic: D
+  tag: '00340005'
+  keyword: SourceIdentifier
+  retired: false
+  in_std_comp_iod: true
+- name: Source Image Sequence
+  basic: X/Z/U*
+  tag: 00082112
+  keyword: SourceImageSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Source Manufacturer
+  basic: X
+  tag: 300A0216
+  keyword: SourceManufacturer
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Source of Previous Values
+  basic: Z
+  tag: '04000564'
+  keyword: SourceOfPreviousValues
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_institution_identity: K
+- name: Source Serial Number
+  basic: X/Z
+  tag: '30080105'
+  keyword: SourceSerialNumber
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Source Start DateTime
+  basic: D
+  tag: 00189369
+  keyword: SourceStartDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Source Strength Reference Date
+  basic: D
+  tag: 300A022C
+  keyword: SourceStrengthReferenceDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Source Strength Reference Time
+  basic: D
+  tag: 300A022E
+  keyword: SourceStrengthReferenceTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Special Needs
+  basic: X
+  tag: 00380050
+  keyword: SpecialNeeds
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_patient_characteristics: C
+- name: Specimen Accession Number
+  basic: X
+  tag: 0040050A
+  keyword: SpecimenAccessionNumber
+  retired: true
+  in_std_comp_iod: false
+- name: Specimen Detailed Description
+  basic: X
+  tag: '00400602'
+  keyword: SpecimenDetailedDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Specimen Identifier
+  basic: D
+  tag: '00400551'
+  keyword: SpecimenIdentifier
+  retired: false
+  in_std_comp_iod: true
+- name: Specimen Preparation Sequence
+  basic: Z
+  tag: '00400610'
+  keyword: SpecimenPreparationSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_structured_content: C
+- name: Specimen Short Description
+  basic: X
+  tag: '00400600'
+  keyword: SpecimenShortDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Specimen UID
+  basic: U
+  tag: '00400554'
+  keyword: SpecimenUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Start Acquisition DateTime
+  basic: X/D
+  tag: 00189516
+  keyword: StartAcquisitionDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Station AE Title
+  basic: X
+  tag: 00080055
+  keyword: StationAETitle
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: C
+- name: Station Name
+  basic: X/Z/D
+  tag: 00081010
+  keyword: StationName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Storage Media File-set UID
+  basic: U
+  tag: 00880140
+  keyword: StorageMediaFileSetUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Structure Set Date
+  basic: Z
+  tag: '30060008'
+  keyword: StructureSetDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Structure Set Description
+  basic: X
+  tag: '30060006'
+  keyword: StructureSetDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Structure Set Label
+  basic: D
+  tag: '30060002'
+  keyword: StructureSetLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Structure Set Name
+  basic: X
+  tag: '30060004'
+  keyword: StructureSetName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Structure Set Time
+  basic: Z
+  tag: '30060009'
+  keyword: StructureSetTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Arrival Date
+  basic: X
+  tag: '00321040'
+  keyword: StudyArrivalDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Arrival Time
+  basic: X
+  tag: '00321041'
+  keyword: StudyArrivalTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Comments
+  basic: X
+  tag: '00324000'
+  keyword: StudyComments
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Study Completion Date
+  basic: X
+  tag: '00321050'
+  keyword: StudyCompletionDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Completion Time
+  basic: X
+  tag: '00321051'
+  keyword: StudyCompletionTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Date
+  basic: Z
+  tag: 00080020
+  keyword: StudyDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Description
+  basic: X
+  tag: 00081030
+  keyword: StudyDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Study ID
+  basic: Z
+  tag: '00200010'
+  keyword: StudyID
+  retired: false
+  in_std_comp_iod: true
+- name: Study ID Issuer
+  basic: X
+  tag: '00320012'
+  keyword: StudyIDIssuer
+  retired: true
+  in_std_comp_iod: false
+- name: Study Instance UID
+  basic: U
+  tag: 0020000D
+  keyword: StudyInstanceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Study Read Date
+  basic: X
+  tag: '00320034'
+  keyword: StudyReadDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Read Time
+  basic: X
+  tag: '00320035'
+  keyword: StudyReadTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Time
+  basic: Z
+  tag: 00080030
+  keyword: StudyTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Verified Date
+  basic: X
+  tag: '00320032'
+  keyword: StudyVerifiedDate
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Study Verified Time
+  basic: X
+  tag: '00320033'
+  keyword: StudyVerifiedTime
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Substance Administration DateTime
+  basic: X
+  tag: '00440010'
+  keyword: SubstanceAdministrationDateTime
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Synchronization Frame of Reference UID
+  basic: U
+  tag: '00200200'
+  keyword: SynchronizationFrameOfReferenceUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Table Top Position Alignment UID
+  basic: U
+  tag: 300A0054
+  keyword: TableTopPositionAlignmentUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Target UID
+  basic: U
+  tag: 00182042
+  keyword: TargetUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Telephone Number (Trial)
+  basic: X
+  tag: 0040A354
+  keyword: TelephoneNumberTrial
+  retired: true
+  in_std_comp_iod: false
+- name: Template Extension Creator UID
+  basic: U
+  tag: 0040DB0D
+  keyword: TemplateExtensionCreatorUID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Template Extension Organization UID
+  basic: U
+  tag: 0040DB0C
+  keyword: TemplateExtensionOrganizationUID
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Template Local Version
+  basic: X
+  tag: 0040DB07
+  keyword: TemplateLocalVersion
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Template Version
+  basic: X
+  tag: 0040DB06
+  keyword: TemplateVersion
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Text Comments
+  basic: X
+  tag: '40004000'
+  keyword: TextComments
+  retired: true
+  in_std_comp_iod: false
+- name: Text String
+  basic: X
+  tag: '20300020'
+  keyword: TextString
+  retired: false
+  in_std_comp_iod: false
+- name: Third Person Pronouns Sequence
+  basic: X
+  tag: '00100014'
+  keyword: null
+  retired: false
+  in_std_comp_iod: true
+- name: Time
+  basic: D
+  tag: 0040A122
+  keyword: Time
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Time of Document Creation or Verbal Transaction (Trial)
+  basic: X
+  tag: 0040A112
+  keyword: TimeOfDocumentCreationOrVerbalTransactionTrial
+  retired: true
+  in_std_comp_iod: false
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Time of Last Calibration
+  basic: X
+  tag: 00181201
+  keyword: TimeOfLastCalibration
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Time of Last Detector Calibration
+  basic: X/D
+  tag: 0018700E
+  keyword: TimeOfLastDetectorCalibration
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Time of Secondary Capture
+  basic: X
+  tag: 00181014
+  keyword: TimeOfSecondaryCapture
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Timezone Offset From UTC
+  basic: X
+  tag: 00080201
+  keyword: TimezoneOffsetFromUTC
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Topic Author
+  basic: X
+  tag: 00880910
+  keyword: TopicAuthor
+  retired: true
+  in_std_comp_iod: false
+- name: Topic Keywords
+  basic: X
+  tag: 00880912
+  keyword: TopicKeywords
+  retired: true
+  in_std_comp_iod: false
+- name: Topic Subject
+  basic: X
+  tag: 00880906
+  keyword: TopicSubject
+  retired: true
+  in_std_comp_iod: false
+- name: Topic Title
+  basic: X
+  tag: 00880904
+  keyword: TopicTitle
+  retired: true
+  in_std_comp_iod: false
+- name: Tracking UID
+  basic: U
+  tag: '00620021'
+  keyword: TrackingUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Transaction UID
+  basic: U
+  tag: 00081195
+  keyword: TransactionUID
+  retired: false
+  in_std_comp_iod: false
+  options:
+    retain_uids: K
+- name: Transducer Identification Sequence
+  basic: X
+  tag: 00185011
+  keyword: TransducerIdentificationSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Treatment Control Point Date
+  basic: D
+  tag: '30080024'
+  keyword: TreatmentControlPointDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Treatment Control Point Time
+  basic: D
+  tag: '30080025'
+  keyword: TreatmentControlPointTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Treatment Date
+  basic: X/D
+  tag: '30080250'
+  keyword: TreatmentDate
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Treatment Machine Name
+  basic: X/Z
+  tag: 300A00B2
+  keyword: TreatmentMachineName
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: Treatment Position Group Label
+  basic: D
+  tag: 300A0608
+  keyword: TreatmentPositionGroupLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Treatment Position Group UID
+  basic: U
+  tag: 300A0609
+  keyword: TreatmentPositionGroupUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Treatment Session UID
+  basic: U
+  tag: 300A0700
+  keyword: TreatmentSessionUID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_uids: K
+- name: Treatment Site
+  basic: X/D
+  tag: '30100077'
+  keyword: TreatmentSite
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Treatment Sites
+  basic: X
+  tag: 300A000B
+  keyword: TreatmentSites
+  retired: true
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Treatment Technique Notes
+  basic: Z
+  tag: 3010007A
+  keyword: TreatmentTechniqueNotes
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Treatment Time
+  basic: X/D
+  tag: '30080251'
+  keyword: TreatmentTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Treatment Tolerance Violation DateTime
+  basic: D
+  tag: 300A0736
+  keyword: TreatmentToleranceViolationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Treatment Tolerance Violation Description
+  basic: D
+  tag: 300A0734
+  keyword: TreatmentToleranceViolationDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: UDI Sequence
+  basic: X
+  tag: 0018100A
+  keyword: UDISequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: UID
+  basic: U
+  tag: 0040A124
+  keyword: UID
+  retired: false
+  in_std_comp_iod: true
+- name: Unformatted Text Value
+  basic: D
+  tag: '00700006'
+  keyword: UnformattedTextValue
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Unique Device Identifier
+  basic: X
+  tag: 00181009
+  keyword: UniqueDeviceIdentifier
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: User Content Label
+  basic: D
+  tag: '30100033'
+  keyword: UserContentLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: User Content Long Label
+  basic: D
+  tag: '30100034'
+  keyword: UserContentLongLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: Verbal Source (Trial)
+  basic: X
+  tag: 0040A352
+  keyword: VerbalSourceTrial
+  retired: true
+  in_std_comp_iod: false
+- name: Verbal Source Identifier Code Sequence (Trial)
+  basic: X
+  tag: 0040A358
+  keyword: VerbalSourceIdentifierCodeSequenceTrial
+  retired: true
+  in_std_comp_iod: false
+- name: Verification DateTime
+  basic: D
+  tag: 0040A030
+  keyword: VerificationDateTime
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_longitudinal_full_dates: K
+    retain_longitudinal_modified_dates: C
+- name: Verifying Observer Identification Code Sequence
+  basic: Z
+  tag: 0040A088
+  keyword: VerifyingObserverIdentificationCodeSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Verifying Observer Name
+  basic: D
+  tag: 0040A075
+  keyword: VerifyingObserverName
+  retired: false
+  in_std_comp_iod: true
+- name: Verifying Observer Sequence
+  basic: D
+  tag: 0040A073
+  keyword: VerifyingObserverSequence
+  retired: false
+  in_std_comp_iod: true
+- name: Verifying Organization
+  basic: D
+  tag: 0040A027
+  keyword: VerifyingOrganization
+  retired: false
+  in_std_comp_iod: true
+- name: Visit Comments
+  basic: X
+  tag: 00384000
+  keyword: VisitComments
+  retired: false
+  in_std_comp_iod: false
+  options:
+    clean_descriptors: C
+- name: Waveform Annotation Sequence
+  basic: X/D
+  tag: 0040B020
+  keyword: WaveformAnnotationSequence
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_structured_content: C
+- name: Waveform Filter Description
+  basic: X
+  tag: 003A0329
+  keyword: WaveformFilterDescription
+  retired: false
+  in_std_comp_iod: true
+  options:
+    clean_descriptors: C
+- name: X-Ray Detector ID
+  basic: D
+  tag: 00189371
+  keyword: XRayDetectorID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: X-Ray Detector Label
+  basic: X
+  tag: 00189373
+  keyword: XRayDetectorLabel
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
+- name: X-Ray Source ID
+  basic: D
+  tag: 00189367
+  keyword: XRaySourceID
+  retired: false
+  in_std_comp_iod: true
+  options:
+    retain_device_identity: K
