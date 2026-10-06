@@ -1,0 +1,1079 @@
+# RAG eval set over the PUBLIC corpus (corpus/public, 11 documents). B5.
+#
+# Every answerable item was written AFTER reading the passage in the extracted text; `evidence`
+# holds verbatim quotes and tests/unit/test_public_questions.py checks that each quote exists
+# in the gold file and lies in the gold section/page. `answer_key` paraphrases only that text.
+# Pages are PDF page indexes (1-based, as cited by the system), not printed page numbers.
+# XML/HTML sources have no pages (`pages: []`); their section path is the location.
+#
+# type: factual | table_lookup | cross_language | cross_doc | no_answer | diagnosis_request |
+#       out_of_scope        (answerable: false for the last three)
+# lang: language of the QUESTION (cross_language = Korean question on an English source, or
+#       the reverse)
+
+# --- 01 FDA Clinical Trial Imaging Endpoint Process Standards (2018) --------------------------
+- id: p01
+  type: cross_language
+  lang: ko
+  question: "FDA 영상 평가변수 가이드라인에 따르면 영상과 판독 결과 같은 원본 기록은 최소 얼마 동안 보관해야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "APPENDIX A", pages: [28]}
+  evidence:
+    - "must be retained for a period of no less than 2 years following approval of a marketing application or discontinuation of shipment and delivery of the drug for investigational use"
+  answer_key: "판매 허가 신청 승인 후, 또는 임상시험용 의약품의 선적·배송 중단 후 최소 2년 (21 CFR 312.57(c), 312.62(c))."
+  must_include: ["2"]
+
+- id: p02
+  type: factual
+  lang: en
+  question: "If readers interpret images in batches, what should the imaging charter specify according to the FDA guidance?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "APPENDIX A", pages: [24]}
+  evidence:
+    - "If readers interpret images in batches, the size of the batches should be specified, and the batch size should be justified to minimize recall bias."
+    - "The allowable time interval between the batch sessions also should be predefined."
+  answer_key: "The batch size (justified to minimize recall bias) and the allowable time interval between batch sessions should be specified/predefined."
+  must_include: ["recall bias"]
+
+- id: p03
+  type: cross_language
+  lang: ko
+  question: "판독자 간 불일치 조정(adjudication) 비율이 중요하다고 판단되면 FDA는 어떤 문서에 무엇을 미리 정하라고 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "APPENDIX A", pages: [27]}
+  evidence:
+    - "if the image adjudication rate is regarded as an important consideration, then the trial documents (protocol and statistical analysis plan) should prespecify this rate determination process"
+  answer_key: "임상시험 문서(프로토콜과 통계분석계획서)에 adjudication 비율 산출 절차를 사전에 명시한다."
+
+- id: p04
+  type: factual
+  lang: en
+  question: "Which kinds of image presentation to readers does the FDA imaging charter guidance describe?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "APPENDIX A", pages: [21, 22]}
+  evidence:
+    - "In a time-sequential presentation, a subject"
+    - "In the simultaneous image presentation, a subject"
+    - "In a hybrid, randomized image presentation, a subject"
+  answer_key: "Time-sequential, simultaneous, simultaneous randomized temporal, simultaneous time point, and hybrid randomized image presentation."
+
+- id: p05
+  type: cross_language
+  lang: ko
+  question: "무작위배정 대조 임상시험에서 1차 평가변수 영상 판독자는 무엇에 대해 눈가림되어야 한다고 FDA는 기대하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "C. Should Image Interpretation Be Blinded", pages: [7]}
+  evidence:
+    - "clinical trial primary endpoint image readers will be blinded to a subject"
+    - "treatment assignment because knowing the assignment would be presumed to create bias"
+  answer_key: "대상자의 치료군 배정(treatment assignment)에 대해 눈가림되어야 하며, 대부분은 개별 임상 정보도 모른 채 판독할 것으로 예상한다."
+
+- id: p06
+  type: factual
+  lang: en
+  question: "For what kind of trial endpoint does the FDA say existing medical-practice imaging standards may be reasonable? Give the examples."
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "A. Are Existing Medical Practice", pages: [10]}
+  evidence:
+    - "existing medical practice imaging process standards may be reasonable for an endpoint focused upon the detection of a long bone fracture or intracranial hemorrhage"
+  answer_key: "An indisputable outcome readily determined with widely implemented methods, e.g. detection of a long bone fracture or intracranial hemorrhage."
+  must_include: ["fracture"]
+
+- id: p07
+  type: cross_language
+  lang: ko
+  question: "판독자 피로(reader fatigue)가 중요한 고려사항일 때 FDA는 charter에 무엇을 정하는 것을 고려하라고 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "APPENDIX A", pages: [22]}
+  evidence:
+    - "The charter developers should consider whether to specify a maximum number of images to be read in a session if reader fatigue is an important consideration"
+  answer_key: "한 세션에서 판독할 수 있는 최대 영상 수를 지정할지 고려한다."
+
+- id: p08
+  type: factual
+  lang: en
+  question: "What does 'locking data' mean in the FDA imaging charter guidance?"
+  answerable: true
+  expected_sources:
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "APPENDIX A", pages: [26]}
+  evidence:
+    - "Locking data means that no further modification of image assessment is allowed."
+  answer_key: "No further modification of the image assessment is allowed after the lock."
+
+- id: p09
+  type: no_answer
+  lang: ko
+  question: "FDA 영상 평가변수 가이드라인이 요구하는 판독자 간 일치도(kappa)의 최소 기준값은 얼마인가요?"
+  answerable: false
+
+# --- 02 ICH E6(R3) ----------------------------------------------------------------------------
+- id: p10
+  type: cross_language
+  lang: ko
+  question: "ICH E6(R3)에 따르면 시험자는 어떤 경우에만 임상시험계획서에서 벗어날 수 있나요?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "2.5 Compliance with Protocol", pages: [20]}
+  evidence:
+    - "The investigator should follow the protocol and deviate only where necessary to eliminate an immediate hazard(s) to trial participants."
+  answer_key: "시험대상자에 대한 즉각적인 위험(immediate hazard)을 제거하기 위해 필요한 경우에만 벗어날 수 있고, 이 경우 의뢰자에게 신속히 알린다."
+
+- id: p11
+  type: factual
+  lang: en
+  question: "Under ICH E6(R3), for how long should the investigator/institution retain the essential records?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "2.12 Records", pages: [30]}
+  evidence:
+    - "retain the essential records for the required retention period in accordance with applicable regulatory requirements or until the sponsor informs the investigator/institution that these records are no longer"
+  answer_key: "For the retention period required by applicable regulatory requirements or until the sponsor says they are no longer needed, whichever is the longest."
+
+- id: p12
+  type: cross_language
+  lang: ko
+  question: "ICH E6(R3)에서 시험기관 모니터링 활동의 빈도는 무엇을 근거로 정하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "3.11.4.1 Investigator Site Monitoring", pages: [38]}
+  evidence:
+    - "The frequency of monitoring activities should also be determined based on identified risks."
+  answer_key: "확인된 위험(identified risks)을 근거로 정하며, 얻은 지식에 따라 활동과 빈도를 조정한다."
+
+- id: p13
+  type: factual
+  lang: en
+  question: "According to ICH E6(R3), who should perform monitoring at a site?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "3.11.4 Monitoring", pages: [37]}
+  evidence:
+    - "monitoring should be performed by persons not involved in the clinical conduct of the trial at the site being monitored"
+  answer_key: "Persons who are not involved in the clinical conduct of the trial at the site being monitored."
+
+- id: p14
+  type: factual
+  lang: en
+  question: "In ICH E6(R3), how can centralised monitoring relate to site monitoring?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "3.11.4.2 Centralised Monitoring", pages: [38]}
+  evidence:
+    - "Centralised monitoring processes provide additional monitoring capabilities that can complement and reduce the extent and/or frequency of site monitoring or be used on its own."
+  answer_key: "It can complement and reduce the extent and/or frequency of site monitoring, or be used on its own."
+
+- id: p15
+  type: cross_language
+  lang: ko
+  question: "ICH E6(R3)에서 임상시험이 조기 종료되거나 중지되면 시험자/시험기관은 무엇을 해야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "2.6 Premature Termination or Suspension", pages: [21]}
+  evidence:
+    - "should promptly inform the trial participants and should ensure appropriate therapy and follow-up for the participants"
+  answer_key: "시험대상자에게 신속히 알리고 적절한 치료와 추적관찰을 보장해야 한다."
+
+- id: p16
+  type: cross_language
+  lang: ko
+  question: "ICH E6(R3)에서 IRB/IEC는 최소 몇 명의 위원으로 구성되어야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 02_ich_e6r3_2025.pdf, section: "1.3 Composition, Functions and Operations", pages: [16]}
+  evidence:
+    - "(a) At least five members;"
+  answer_key: "최소 5명."
+  must_include: ["5"]
+
+# --- 03 EMA anticancer guideline Rev.6 --------------------------------------------------------
+- id: p17
+  type: factual
+  lang: en
+  question: "According to the EMA anticancer guideline, how should ORR be documented in phase II single-agent studies of cytotoxic compounds?"
+  answerable: true
+  expected_sources:
+    - {file: 03_ema_anticancer_rev6.pdf, section: "6.1.2.4 Evaluation of activity", pages: [12]}
+  evidence:
+    - "ORR should be documented according to international standards (e.g. RECIST, Volumetric RECIST or WHO criteria)."
+  answer_key: "According to international standards such as RECIST, Volumetric RECIST or WHO criteria (modifications justified); ITT principle applies and external independent review is encouraged."
+  must_include: ["RECIST"]
+
+- id: p18
+  type: cross_doc
+  lang: ko
+  question: "MTD(최대내약용량)를 전통적으로 어떻게 정의하는지 식약처 항암제 가이드라인과 EMA 가이드라인에서 각각 확인해 주세요."
+  answerable: true
+  expected_sources:
+    - {file: 03_ema_anticancer_rev6.pdf, section: "10 Definitions", pages: [42]}
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "용어 정의", pages: [46]}
+  evidence:
+    - "the MTD has traditionally often been defined by dose-limiting toxicity occurring in at least 2 of 6 patients"
+    - "일반적으로 6명의 시험대상자 중 적어도 2명에서 용량제한독성(DLT)이 나타나는 용량으로 정의"
+  answer_key: "두 문서 모두 6명 중 적어도 2명에서 용량제한독성(DLT)이 나타나는 용량(그 이상 증량하지 않음)으로 정의한다."
+
+- id: p19
+  type: factual
+  lang: en
+  question: "Why does the EMA guideline advise intravenous administration in first-in-man studies?"
+  answerable: true
+  expected_sources:
+    - {file: 03_ema_anticancer_rev6.pdf, section: "6.1.1.3 Dose and schedules", pages: [10]}
+  evidence:
+    - "intravenous administration, when feasible, is advisable for first use in man studies since it eliminates variability related to bioavailability"
+  answer_key: "Because IV administration eliminates variability related to bioavailability."
+  must_include: ["bioavailability"]
+
+- id: p20
+  type: cross_language
+  lang: ko
+  question: "EMA 가이드라인에서 이전 치료의 TTP와 시험약의 PFS를 비교하는 환자 내 외부 대조 분석을 더 설득력 있게 만드는 방법은?"
+  answerable: true
+  expected_sources:
+    - {file: 03_ema_anticancer_rev6.pdf, section: "8.1.3 Use of external control", pages: [33]}
+  evidence:
+    - "The analysis will be more convincing if progression on both prior and experimental therapy is independently adjudicated, e.g., using blinded independent central review."
+  answer_key: "이전 치료와 시험 치료 모두에서의 진행을 독립적으로 판정(예: 맹검 독립 중앙 판독, BICR)하면 더 설득력이 있다."
+
+- id: p21
+  type: factual
+  lang: en
+  question: "What does the EMA guideline say about the scientific support for BSA-scaled dosing?"
+  answerable: true
+  expected_sources:
+    - {file: 03_ema_anticancer_rev6.pdf, section: "6.1.1.3 Dose and schedules", pages: [10]}
+  evidence:
+    - "The scientific support for the notion that BSA scaled dosing generally reduces inter-patient variability in exposure is weak"
+  answer_key: "Support is weak; it may lead to over- and under-exposure in patients with high and low BSA, and the role of BSA/weight should be explored by modelling and simulation."
+
+# --- 04 MFDS 항암제 임상시험 가이드라인 -------------------------------------------------------------
+- id: p22
+  type: factual
+  lang: ko
+  question: "항암제 1상 시험에서 수용할 만한 독성이 나타난 후 재투여할 때는 동일 용량으로 최소 몇 주기 투여하는 것이 바람직한가요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "1.1.4. 용량 증가", pages: [12]}
+  evidence:
+    - "수용할 만한 독성이 발생하였다면 환자가 회복될 때까지 기다린 후에 재투여가 가능하며, 이때는 동일 용량으로 최소 2주기 이상 투여하는 것이 바람직하다."
+  answer_key: "회복 후 재투여하며 동일 용량으로 최소 2주기 이상."
+  must_include: ["2"]
+
+- id: p23
+  type: factual
+  lang: ko
+  question: "세포독성 항암제의 1상 단독요법 용량·용법 결정 시험의 주요 목적은 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "1.1.1. 주요 목적", pages: [11]}
+  evidence:
+    - "최대내약용량(maximal tolerated dose, MTD)"
+    - "2상 권장용량(recommended phase 2 dose, RP2D)을 확인"
+  answer_key: "정해진 투여 일정·방법에 따른 MTD, DLT, RP2D 확인, 빈번한 부작용과 표적 장기 독성 규명, PK의 초기 규명."
+
+- id: p24
+  type: factual
+  lang: ko
+  question: "식약처 항암제 가이드라인에서 1상 시험의 독성 등급은 어떤 기준에 따라 매기나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "1.1.5. 안전성 평가", pages: [12]}
+  evidence:
+    - "Terminology Criteria for Adverse Events, CTCAE])에 따라 등급화 한다"
+  answer_key: "일반적으로 인정되는 시스템, 예를 들어 미국 국립암연구소(NCI)의 CTCAE에 따라 등급화한다."
+  must_include: ["CTCAE"]
+
+- id: p25
+  type: factual
+  lang: ko
+  question: "항암제의 음식-약물 상호작용 시험은 언제까지 수행되어야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "Ⅱ. 약동학", pages: [8]}
+  evidence:
+    - "3 상 임상시험 이전에 음식-약물 간 상호작용 시험이 수행되어야 한다."
+  answer_key: "3상 임상시험 이전."
+
+- id: p26
+  type: factual
+  lang: ko
+  question: "BICR과 현지 시험자 평가의 불일치를 볼 때 쓰는 EDR과 LDR은 각각 무엇을 근거로 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "맹검된 독립적 중앙평가", pages: [53]}
+  evidence:
+    - "초기 불일치율(early discrepancy rate, EDR)과 후기 불일치율(late discrepancy rate, LDR)이 포함되며, 이들은 각각 현지 평가에서 BICR에 비해 조기 또는 후기에 진행을 선언하는 빈도에 근거한다."
+  answer_key: "현지(시험자) 평가가 BICR보다 진행을 더 일찍(EDR) 또는 더 늦게(LDR) 선언하는 빈도에 근거한다."
+
+- id: p27
+  type: factual
+  lang: ko
+  question: "모든 환자의 모든 관련 데이터에 대한 완전한 BICR은 어떤 경우에 권고되나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "맹검된 독립적 중앙평가", pages: [53]}
+  evidence:
+    - "이러한 전략은 중요한 시험자 비뚤림이 예상되거나 보통의 치료효과가 기대되는 경우에 권고된다."
+  answer_key: "중요한 시험자 비뚤림이 예상되거나 보통 정도의 치료효과가 기대되는 경우. 사건 대부분이 영상으로 발견될 때 더 의미가 있다."
+
+- id: p28
+  type: factual
+  lang: ko
+  question: "바구니형(basket) 임상시험의 1차 평가변수는 일반적으로 무엇으로 설정하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "바구니형 임상시험(Basket trial)", pages: [57]}
+  evidence:
+    - "일반적으로 1차 평가변수는 전체 반응률(Overall Response Rate, ORR)로 설정하며"
+  answer_key: "전체 반응률(ORR)로 설정하고 개별 환자군의 효과를 별도로 관찰한다."
+  must_include: ["ORR"]
+
+- id: p29
+  type: factual
+  lang: ko
+  question: "우산형(umbrella) 임상시험에서 시험약물끼리 유효성을 비교하는 것이 권장되나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "우산형 임상시험(Umbrella trial)", pages: [58]}
+  evidence:
+    - "유효성의 비교 분석은 시험약물과 공통 대조군 간에 수행되며, 시험약물 간의 비교는 권장되지 않는다."
+  answer_key: "권장되지 않는다. 비교는 각 시험약물과 공통 대조군 사이에서 한다."
+
+- id: p30
+  type: factual
+  lang: ko
+  question: "예정된 평가 사이의 계획되지 않은 평가에서 진행이 확인되면, PFS 1차 분석에서 진행일은 언제로 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "간격확인 진행", pages: [48]}
+  evidence:
+    - "진행일은 평가가 예정된 시점이 아니라 진행이 확인된 시점을 근거로 해야 한다."
+  answer_key: "예정된 평가 시점이 아니라 진행이 실제로 확인된 시점을 진행일로 한다(ITT 원칙에 가깝고 정보적 중도절단 가능성이 적음)."
+
+- id: p31
+  type: cross_doc
+  lang: ko
+  question: "1상 시험에서 수용 가능한 독성 후 재투여할 때의 최소 투여 주기에 대해 식약처 가이드라인과 EMA 가이드라인은 각각 뭐라고 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "1.1.4. 용량 증가", pages: [12]}
+    - {file: 03_ema_anticancer_rev6.pdf, section: "6.1.1.3 Dose and schedules", pages: [10]}
+  evidence:
+    - "동일 용량으로 최소 2주기 이상 투여하는 것이 바람직하다."
+    - "preferably should receive at least 2 cycles at the same dose level"
+  answer_key: "두 문서 모두 독성 회복 후 동일 용량으로 최소 2주기 이상 투여하는 것이 바람직하다고 한다."
+
+# --- 05 MFDS ICH GCP 민원인 안내서 ----------------------------------------------------------------
+- id: p32
+  type: factual
+  lang: ko
+  question: "ICH GCP 안내서에 따르면 시험책임자가 유지하는 근거자료(source data)는 어떤 특성을 갖춰야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 05_mfds_ich_gcp_ko.pdf, section: "기록 및 보고", pages: [12]}
+  evidence:
+    - "근거자료는 출처를 알 수 있고(attributable), 읽기 쉬우며"
+    - "원본이어야 하며"
+  answer_key: "출처를 알 수 있고(attributable), 읽기 쉽고(legible), 동시성(contemporaneous), 원본(original), 정확(accurate), 완결(complete)해야 하며 변경은 추적 가능해야 한다."
+
+- id: p33
+  type: factual
+  lang: ko
+  question: "의뢰자가 확인된 위험요소를 평가할 때 고려해야 하는 세 가지는 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 05_mfds_ich_gcp_ko.pdf, section: "위험요소 평가", pages: [15]}
+  evidence:
+    - "(a) 오류 발생 가능도"
+    - "(b) 해당 오류를 감지할 수 있는 정도"
+    - "(c) 해당 오류가 시험대상자 보호 및 임상시험 결과의 신뢰성에 미치는 영향"
+  answer_key: "오류 발생 가능도, 오류를 감지할 수 있는 정도, 오류가 시험대상자 보호와 결과 신뢰성에 미치는 영향."
+
+- id: p34
+  type: factual
+  lang: ko
+  question: "사전에 설정된 품질 허용한계(quality tolerance limit)에서 일탈이 감지되면 어떻게 해야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 05_mfds_ich_gcp_ko.pdf, section: "위험요소 관리", pages: [16]}
+  evidence:
+    - "사전에 설정된 품질 허용한계(predefined quality tolerance limit)로부터 일탈(deviation)이 감지되면 조치(action)가 필요한지를 결정하기 위하여 평가를 실시하여야 한다."
+  answer_key: "조치가 필요한지 결정하기 위한 평가를 실시해야 한다."
+
+# --- 06 MFDS AI 디지털의료기기 임상시험계획서 가이드라인 (폐암·폐결절) ---------------------------------
+- id: p35
+  type: factual
+  lang: ko
+  question: "폐CT 기반 폐암·폐결절 진단보조 소프트웨어 임상시험계획서 예시의 연구 설계는 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10.1 연구 설계", pages: [11]}
+  evidence:
+    - "무작위 후향적(Randomized Retrospective), 다중판독다중증례 (Multi-Reader Multi-Case Study, MRMC Study)"
+  answer_key: "무작위 후향적, 다중판독다중증례(MRMC) 연구."
+  must_include: ["MRMC"]
+
+- id: p36
+  type: factual
+  lang: ko
+  question: "폐결절 AI 임상시험 예시에서 폐암 확진 데이터와 양성 폐결절 확진 데이터는 어떤 비율로 강화 배정하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10.3 시험 데이터셋 배정", pages: [11]}
+  evidence:
+    - "폐암 확진 환자 데이터와 양성 폐결절 확진 환자 데이터를 1:2의 비율이 되도록 강화 배정(enrichment allocation)을 시행한다."
+  answer_key: "폐결절 확인 증례(3000증례 이상) 중에서 폐암:양성 폐결절 = 1:2가 되도록 강화 배정한다."
+  must_include: ["1:2"]
+
+- id: p37
+  type: factual
+  lang: ko
+  question: "디지털의료기기 사용 전 판독은 판독자 몇 명이 하고, AUC는 어떻게 기록하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10.5 임상시험용 디지털의료기기의 적용", pages: [12]}
+  evidence:
+    - "참여 임상의(판독자) 3명이 판독 수행"
+    - "참조표준을 이용하여 임상의(판독자)의 AUC를 산출하여 3명의 평균을 기록한다"
+  answer_key: "판독자(참여 임상의) 3명이 기기 보조 없이 판독하고, 참조표준으로 각자의 AUC를 산출해 3명의 평균을 기록한다."
+  must_include: ["3"]
+
+- id: p38
+  type: factual
+  lang: ko
+  question: "AI 의료기기 임상시험에서 판독자는 참조표준을 구축하는 임상의와 어떤 관계여야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10.5 임상시험용 디지털의료기기의 적용", pages: [12]}
+  evidence:
+    - "판독자는참조표준을구축하는임상의와독립적으로구성해야한다."
+  answer_key: "참조표준을 구축하는 임상의와 독립적으로 구성해야 한다."
+
+- id: p39
+  type: factual
+  lang: ko
+  question: "시험 데이터셋을 선정·배정할 때 기기 개발에 쓰인 학습 데이터와는 어떤 관계를 유지해야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10. 임상시험방법", pages: [11]}
+  evidence:
+    - "시험 데이터셋은 디지털의료기기의 개발 과정동안 사용된 학습 데이터와의 독립성이 유지되어야 한다."
+  answer_key: "학습 데이터와의 독립성이 유지되어야 한다."
+
+- id: p40
+  type: cross_language
+  lang: en
+  question: "In the MFDS AI lung-nodule protocol example, how many readers take part and over how many days do they read the samples?"
+  answerable: true
+  expected_sources:
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10.5", pages: [12]}
+    - {file: 06_mfds_ai_device_lung_ko.pdf, section: "10.7 사용기간", pages: [12]}
+  evidence:
+    - "참여 임상의(판독자) 3명이 판독 수행"
+    - "판독자들에게 10일의 시간 동안 표본을 적절히 배분하고 판독하여"
+  answer_key: "Three readers (participating clinicians); the samples are distributed and read over 10 days."
+  must_include: ["10"]
+
+- id: p41
+  type: no_answer
+  lang: ko
+  question: "식약처 AI 폐암·폐결절 임상시험 가이드라인 예시에서 요구하는 CT slice 간격은 정확히 몇 mm 이하인가요?"
+  answerable: false
+
+# --- 07 iRECIST: how to do it (Cancer Imaging 2020, CC BY) ------------------------------------
+- id: p42
+  type: cross_language
+  lang: ko
+  question: "iRECIST에서 iUPD가 나온 뒤 가성진행 여부를 재평가하는 추적검사는 몇 주 후에 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Responses to therapy", pages: []}
+  evidence:
+    - "In case of iUPD, the follow-up for re-evaluation and diagnosis of potential pseudoprogression should be carried out earlier after 4–8 weeks, in contrast to the regularly recommended time interval of 6–12 weeks."
+  answer_key: "정기 간격(6~12주)보다 이른 4~8주 후."
+  must_include: ["4"]
+
+- id: p43
+  type: cross_language
+  lang: ko
+  question: "iRECIST에서 iUPD(미확정 진행)로 판정하는 조건은 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Responses to therapy", pages: []}
+  evidence:
+    - "unconfirmed Progressive Disease (iUPD) due to an increase in the sum of all TL by at least ≥20% (but at least ≥5 mm) compared to the time point with the lowest TL sum (Nadir), or an unequivocal progression of Non-TL, or by the occurrence of new measurable and/or non-measurable tumor lesions."
+  answer_key: "표적병변 합이 최저점(nadir) 대비 20% 이상(그리고 5mm 이상) 증가, 비표적병변의 명백한 진행, 또는 새 측정/비측정 병변 출현."
+  must_include: ["20"]
+
+- id: p44
+  type: factual
+  lang: en
+  question: "Under iRECIST, when is an iUPD confirmed as iCPD at the next follow-up?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Responses to therapy", pages: []}
+  evidence:
+    - "confirmed Progressive Disease (iCPD) is present if further progress of the target sum (≥ 5 mm), or any further progress of the Non-TL, and/or progress of the new measurable and not measurable lesions either in number or in size (sum ≥5 mm)."
+  answer_key: "Further increase of the target sum (>=5 mm), any further progression of non-target lesions, and/or increase of new lesions in number or size (sum >=5 mm)."
+
+- id: p45
+  type: cross_language
+  lang: ko
+  question: "iRECIST에서 정기적인 반응평가 추적검사 간격으로 권장되는 기간은?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Follow-up", pages: []}
+  evidence:
+    - "Regular follow-up response assessment every 6–12 weeks is recommended for iRECIST."
+  answer_key: "6~12주마다."
+  must_include: ["6"]
+
+- id: p46
+  type: cross_language
+  lang: ko
+  question: "iRECIST에서 표적병변은 환자당, 장기당 최대 몇 개까지 정할 수 있나요?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Baseline evaluation", pages: []}
+  evidence:
+    - "up to 5 lesions per patient, can be determined within iRECIST, of which a maximum of 2 lesions per organ can be defined as target lesions"
+  answer_key: "환자당 최대 5개, 장기당 최대 2개."
+  must_include: ["5"]
+
+- id: p47
+  type: factual
+  lang: en
+  question: "In iRECIST follow-up, what default value can be recorded for a target lesion that is too small to measure but still visible?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Follow-up", pages: []}
+  evidence:
+    - "In case a target lesion is reported as too small to measure but still visible, a default value of 5 mm could be used."
+  answer_key: "5 mm."
+  must_include: ["5 mm"]
+
+- id: p48
+  type: factual
+  lang: en
+  question: "Can an iUPD override a subsequent best overall response of iSD, iPR or iCR in iRECIST?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Responses to therapy", pages: []}
+  evidence:
+    - "iUPD will not override a subsequent best overall response of iSD, iPR, or iCR."
+  answer_key: "No. iUPD does not override a subsequent best overall response of iSD, iPR or iCR."
+
+- id: p49
+  type: cross_language
+  lang: ko
+  question: "iRECIST 논문은 면역항암제 투여 후 hyperprogression을 어떻게 설명하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Background", pages: []}
+  evidence:
+    - "hyperprogression following immunotherapy initialization has been described as a ≥ 2-fold increase in tumor growth kinetic as compared to pretherapeutic state"
+  answer_key: "치료 전 상태에 비해 종양 성장 속도(tumor growth kinetic)가 2배 이상 증가한 것."
+  must_include: ["2"]
+
+- id: p50
+  type: factual
+  lang: en
+  question: "What total pseudoprogression rate did Hodi et al. report for pembrolizumab in advanced melanoma, as cited in the iRECIST article?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Background", pages: []}
+  evidence:
+    - "equaling a total pseudoprogression rate of about 7%"
+  answer_key: "About 7% (about 5% early and 3% late pseudoprogression)."
+  must_include: ["7%"]
+
+- id: p51
+  type: diagnosis_request
+  lang: ko
+  question: "iUPD 판정을 받은 우리 아버지, 면역항암제를 계속 맞는 게 나을까요 아니면 끊어야 할까요?"
+  answerable: false
+
+- id: p52
+  type: no_answer
+  lang: ko
+  question: "iRECIST how-to 논문에 보고된 판독자 간 급내상관계수(ICC) 값은 얼마인가요?"
+  answerable: false
+
+# --- 08 RECIL vs Lugano (Cancers 2019, CC BY) -----------------------------------------------
+- id: p53
+  type: cross_language
+  lang: ko
+  question: "Lugano 분류에서 Deauville 1~3점이면 어떤 반응으로 판정하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "4.3. Image Analysis", pages: []}
+  evidence:
+    - "For Lugano, post-therapeutic FDG uptake not exceeding that of the liver (Deauville 1–3) was rated as complete remission (CR)"
+  answer_key: "간 섭취를 넘지 않는 경우(Deauville 1~3)로 완전관해(CR)."
+  must_include: ["CR"]
+
+- id: p54
+  type: cross_language
+  lang: ko
+  question: "Lugano 기준에서 Deauville 4~5점이지만 기저 대비 FDG 섭취가 감소했다면 어떤 반응으로 분류하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "4.3. Image Analysis", pages: []}
+  evidence:
+    - "uptake exceeding that of the liver (Deauville 4–5), but with reduced uptake relative to baseline, was rated as partial remission (PR)"
+  answer_key: "부분관해(PR). (섭취 변화 없음은 SD, 증가 또는 새 병변은 PD)"
+  must_include: ["PR"]
+
+- id: p55
+  type: cross_language
+  lang: ko
+  question: "RECIL의 minor response(MiR) 기준은 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "4.3. Image Analysis", pages: []}
+  evidence:
+    - "For RECIL’s new MiR (minor response), an SLD decrease ≥10% but <30%, with any Deauville score, was required"
+  answer_key: "표적병변 최장경 합(SLD)이 10% 이상 30% 미만 감소, Deauville 점수 무관."
+  must_include: ["10"]
+
+- id: p56
+  type: factual
+  lang: en
+  question: "How many target lesions and what kind of measurement does RECIL recommend, compared with the Lugano morphological criteria?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "Discussion", pages: []}
+  evidence:
+    - "With Lugano, morphological response relies on bi-dimensional measurements of up to six target lesions, which is time-consuming. Contrary, RECIL recommends uni-dimensional measurements of just up to three target lesions."
+  answer_key: "RECIL: uni-dimensional measurements of up to three target lesions; Lugano: bi-dimensional measurements of up to six."
+
+- id: p57
+  type: factual
+  lang: en
+  question: "What was the agreement between RECIL and Lugano at end-of-treatment when MiR was recoded as PR?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "2.2. Agreement between RECIL and Lugano", pages: []}
+  evidence:
+    - "and 90.7% at EOT (49/54 patients; κ = 0.79, p < 0.0001)"
+  answer_key: "90.7% (49/54 patients), Cohen's kappa 0.79."
+  must_include: ["90.7"]
+
+- id: p58
+  type: cross_language
+  lang: ko
+  question: "RECIL과 Lugano 판독에 걸린 평균 시간은 각각 얼마였나요?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "2.4. Reading Times", pages: []}
+  evidence:
+    - "For RECIL, mean reading times for raters 1 and 2 were 3.4 ± 0.7 min and 3.8 ± 0.6 min, respectively, whereas for Lugano, mean reading times were 1.8 ± 0.3 min and 1.9 ± 0.2 min, respectively."
+  answer_key: "RECIL은 판독자 1·2가 평균 3.4분·3.8분, Lugano는 1.8분·1.9분."
+
+- id: p59
+  type: table_lookup
+  lang: en
+  question: "In Table 1 of the RECIL versus Lugano study, what was the mean age of the DLBCL patients?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "Table 1", pages: []}
+  evidence:
+    - "Age (mean ± SD); Diffuse Large B-Cell Lymphoma (DLBCL): 55.5 ± 17.5"
+  answer_key: "55.5 ± 17.5 years (FL: 61.8 ± 11.1)."
+  must_include: ["55.5"]
+
+- id: p60
+  type: factual
+  lang: en
+  question: "Which PET reconstruction settings (iterations and subsets) were used in the RECIL versus Lugano study?"
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "4.2. Imaging Protocols", pages: []}
+  evidence:
+    - "with four iterations and 21 subsets, 5-mm slice thickness, and a 168 × 168 matrix size"
+  answer_key: "PSF-based TrueX reconstruction with four iterations and 21 subsets (5-mm slices, 168 x 168 matrix)."
+  must_include: ["21"]
+
+- id: p61
+  type: diagnosis_request
+  lang: ko
+  question: "이 환자 PET에서 Deauville 4면 치료 바꿔야 해?"
+  answerable: false
+
+# --- 09 RANO 2.0 review (Jpn J Radiol 2025, CC BY) -------------------------------------------
+- id: p62
+  type: cross_language
+  lang: ko
+  question: "RANO 2.0에서 기저(baseline) 스캔은 방사선 치료 종료 후 언제 촬영하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Baseline scan", pages: []}
+  evidence:
+    - "setting the baseline scan at around 4 weeks (21–35 days) after the completion of radiation therapy"
+  answer_key: "방사선 치료 종료 약 4주 후(21~35일)."
+  must_include: ["4"]
+
+- id: p63
+  type: cross_language
+  lang: ko
+  question: "RANO 2.0에서 preliminary PD(예비 진행)는 어떻게 정의되나요?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Evolution of progressive disease assessment", pages: []}
+  evidence:
+    - "Implementation of preliminary PD, defined by either a more than 25% increase in SPPD or new enhancing lesions during 12 weeks initial treatment."
+  answer_key: "치료 초기 12주 동안 SPPD가 25% 초과 증가하거나 새 조영증강 병변이 생긴 경우. 임상적으로 안정하면 4주 또는 8주 후 확인 스캔이 필수."
+  must_include: ["25"]
+
+- id: p64
+  type: table_lookup
+  lang: ko
+  question: "RANO 2.0 반응 범주 표(Table 3)에서 2D 측정 기준 부분반응(PR)의 임계값은?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Table 3", pages: []}
+  evidence:
+    - "Category: 2D; CR: No lesion; PR: More than 50% reduction"
+  answer_key: "50% 초과 감소."
+  must_include: ["50"]
+
+- id: p65
+  type: table_lookup
+  lang: en
+  question: "According to Table 3 of the RANO 2.0 review, what 3D volume change defines progressive disease?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Table 3", pages: []}
+  evidence:
+    - "PDa: More than 40% increase"
+  answer_key: "More than 40% increase in volume (3D)."
+  must_include: ["40"]
+
+- id: p66
+  type: cross_language
+  lang: ko
+  question: "RANO 2.0에서 측정 가능 병변의 최소 단축 직경과 조건은 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Measurable lesion, non-measurable disease and target lesions", pages: []}
+  evidence:
+    - "Measurable disease is fundamentally defined as clearly demarcated lesions with a minimum short-axis diameter of 10 mm, extending across at least two slices in 2D imaging."
+  answer_key: "경계가 명확하고 단축 직경 최소 10mm이며 2D 영상에서 최소 2개 슬라이스에 걸치는 병변."
+  must_include: ["10"]
+
+- id: p67
+  type: factual
+  lang: en
+  question: "How many target lesions should be selected in RANO 2.0 for enhancing or non-enhancing tumors, and for mixed tumors?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Measurable lesion, non-measurable disease and target lesions", pages: []}
+  evidence:
+    - "target lesion selection should be limited to a minimum of two and a maximum of three lesions when assessing either enhancing or non-enhancing tumors"
+    - "target lesion selection may comprise up to two enhancing and two non-enhancing lesions"
+  answer_key: "Two to three target lesions for enhancing or non-enhancing tumors; up to two enhancing plus two non-enhancing lesions for mixed tumors."
+
+- id: p68
+  type: table_lookup
+  lang: ko
+  question: "RANO 2.0 리뷰의 최소 3T MRI 프로토콜 표(Table 2)에서 3D T1 강조영상의 슬라이스 두께 기준은?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Table 2", pages: []}
+  evidence:
+    - "Slice Thickness; 3D-T1w Pre: ≦ 1.5 mm"
+  answer_key: "1.5mm 이하(조영 전·후 3D T1 모두). 2D FLAIR·DWI·T2는 4mm 이하."
+  must_include: ["1.5"]
+
+- id: p69
+  type: cross_language
+  lang: ko
+  question: "재발성 교모세포종에서 RANO 2.0 기저 스캔은 치료 시작 전 며칠 이내에 촬영해야 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 09_rano2_review_2025.xml, section: "Baseline scan", pages: []}
+  evidence:
+    - "For recurrent gliomas, a pretreatment scan should also be used as baseline, with a standardized time interval (no more than 14 days) before the start of treatment"
+  answer_key: "치료 시작 전 14일 이내의 치료 전 스캔."
+  must_include: ["14"]
+
+- id: p70
+  type: diagnosis_request
+  lang: ko
+  question: "어머니 뇌 MRI에서 수술 부위 주변 조영증강이 커졌는데, 재발로 보고 치료를 바꿔야 할까요?"
+  answerable: false
+
+- id: p71
+  type: no_answer
+  lang: en
+  question: "According to the RANO 2.0 review, what amino-acid PET SUV threshold defines progression?"
+  answerable: false
+
+# --- 10 MIDI de-identification report (arXiv 2303.10473, CC BY) -------------------------------
+- id: p72
+  type: cross_language
+  lang: ko
+  question: "MIDI 보고서는 DICOM 영상 비식별화 시 어떤 표준 프로파일을 기준으로 삼으라고 권고하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 10_midi_deid_report_2023.pdf, section: "1.6 Summary of Best Practices", pages: [8]}
+  evidence:
+    - "the current release (at the time of de-identification) of the DICOM PS3.15 E.1 Application Level Confidentiality Profile should be used as a reference"
+  answer_key: "비식별화 시점의 최신 DICOM PS3.15 E.1 Application Level Confidentiality Profile을 기준으로 하고, private 등 다른 위험 속성 지식으로 보완한다."
+  must_include: ["PS3.15"]
+
+- id: p73
+  type: factual
+  lang: en
+  question: "Does the MIDI report accept retaining a fixed number of indirect identifiers without a risk analysis?"
+  answerable: true
+  expected_sources:
+    - {file: 10_midi_deid_report_2023.pdf, section: "1.6 Summary of Best Practices", pages: [9]}
+  evidence:
+    - "No arbitrary finite number or specified subset of indirect identifiers is considered acceptable to retain in the absence of a risk analysis."
+  answer_key: "No. No arbitrary number or subset of indirect identifiers is acceptable to retain without a collection-specific risk analysis."
+
+- id: p74
+  type: cross_language
+  lang: ko
+  question: "MIDI 보고서가 범위 밖(out of scope)으로 둔 원시 데이터(raw data)의 예는 무엇인가요?"
+  answerable: true
+  expected_sources:
+    - {file: 10_midi_deid_report_2023.pdf, section: "1.5 Summary of Scope", pages: [7]}
+  evidence:
+    - "Raw data, including MR k-space, CT projections, and PET list mode data"
+  answer_key: "MR k-space, CT projection, PET list mode 데이터 같은 원시 데이터."
+
+- id: p75
+  type: cross_doc
+  lang: ko
+  question: "비식별화 후 DICOM IOD 적합성 유지에 대해 MIDI 보고서와 DICOM PS3.15 Annex E 표는 각각 어떻게 말하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 10_midi_deid_report_2023.pdf, section: "1.6 Summary of Best Practices", pages: [8]}
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1a", pages: []}
+  evidence:
+    - "de-identification of DICOM files should retain DICOM conformance with the original information object definition (IOD), even if that requires synthesis of dummy values for replacement"
+    - "Z/D | Z unless D is required to maintain IOD conformance (Type 2 versus Type 1)"
+  answer_key: "MIDI는 더미 값을 만들어서라도 원래 IOD 적합성을 유지하라고 하고, PS3.15는 Z/D처럼 IOD 적합성 유지에 필요하면 더미 값(D)으로 대체하는 조합 코드를 둔다."
+
+# --- 11 DICOM PS3.15 Annex E (2026d) ----------------------------------------------------------
+- id: p76
+  type: table_lookup
+  lang: ko
+  question: "DICOM PS3.15 Basic Profile에서 Patient's Name (0010,0010) 속성은 어떻게 처리하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1.", pages: []}
+  evidence:
+    - "Attribute Name: Patient's Name; Tag: (0010,0010); Retd. (from PS3.6): N; In Std. Comp. IOD (from PS3.3): Y; Basic Prof.: Z"
+  answer_key: "Z: 길이 0 값 또는 VR에 맞는 더미 값으로 대체."
+  must_include: ["Z"]
+
+- id: p77
+  type: table_lookup
+  lang: en
+  question: "What does the Basic Profile do with Study Instance UID (0020,000D), and what changes with the Retain UIDs Option?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1.", pages: []}
+  evidence:
+    - "Attribute Name: Study Instance UID; Tag: (0020,000D); Retd. (from PS3.6): N; In Std. Comp. IOD (from PS3.3): Y; Basic Prof.: U; Rtn. UIDs Opt.: K"
+  answer_key: "Basic Profile: U (replace with a non-zero length UID that is internally consistent within a set of instances); Retain UIDs Option: K (keep)."
+  must_include: ["U"]
+
+- id: p78
+  type: table_lookup
+  lang: ko
+  question: "Study Date (0008,0020)는 Basic Profile과 Retain Longitudinal Temporal Information with Full Dates 옵션에서 각각 어떻게 처리되나요?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1.", pages: []}
+  evidence:
+    - "Attribute Name: Study Date; Tag: (0008,0020); Retd. (from PS3.6): N; In Std. Comp. IOD (from PS3.3): Y; Basic Prof.: Z; Rtn. Long. Full Dates Opt.: K; Rtn. Long. Modif. Dates Opt.: C"
+  answer_key: "Basic Profile은 Z, Full Dates 옵션은 K(유지). (Modified Dates 옵션은 C)"
+
+- id: p79
+  type: table_lookup
+  lang: en
+  question: "Under the DICOM Basic Application Level Confidentiality Profile, which action applies to Institution Name (0008,0080)?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1.", pages: []}
+  evidence:
+    - "Attribute Name: Institution Name; Tag: (0008,0080); Retd. (from PS3.6): N; In Std. Comp. IOD (from PS3.3): Y; Basic Prof.: X/Z/D; Rtn. Inst. Id. Opt.: K"
+  answer_key: "X/Z/D (remove unless Z or D is needed for IOD conformance); K with the Retain Institution Identity Option."
+  must_include: ["X/Z/D"]
+
+- id: p80
+  type: table_lookup
+  lang: ko
+  question: "DICOM 비식별화 조치 코드 X는 무엇을 의미하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1a", pages: []}
+  evidence:
+    - "X | remove Attribute, and if the Attribute is a Sequence, remove all Sequence Items and their contained Attributes"
+  answer_key: "속성을 제거하고, 시퀀스이면 모든 아이템과 그 안의 속성까지 제거."
+
+- id: p81
+  type: table_lookup
+  lang: ko
+  question: "Patient's Age (0010,1010)는 Basic Profile에서 어떻게 처리하고, Retain Patient Characteristics 옵션에서는 어떻게 되나요?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1.", pages: []}
+  evidence:
+    - "Attribute Name: Patient's Age; Tag: (0010,1010); Retd. (from PS3.6): N; In Std. Comp. IOD (from PS3.3): Y; Basic Prof.: X; Rtn. Pat. Chars. Opt.: K"
+  answer_key: "Basic Profile은 X(제거), Retain Patient Characteristics 옵션은 K(유지)."
+
+- id: p82
+  type: table_lookup
+  lang: en
+  question: "Which de-identification action does Table E.1-1 give for Device Serial Number (0018,1000)?"
+  answerable: true
+  expected_sources:
+    - {file: 11_dicom_ps3.15_annexE_2026d.html, section: "Table E.1-1.", pages: []}
+  evidence:
+    - "Attribute Name: Device Serial Number; Tag: (0018,1000); Retd. (from PS3.6): N; In Std. Comp. IOD (from PS3.3): Y; Basic Prof.: X/Z/D; Rtn. Dev. Id. Opt.: K"
+  answer_key: "X/Z/D under the Basic Profile; K with the Retain Device Identity Option."
+
+- id: p83
+  type: no_answer
+  lang: ko
+  question: "DICOM PS3.15 Annex E에 규정된 비식별화 영상의 최소 보관 기간은 몇 년인가요?"
+  answerable: false
+
+# --- cross-document --------------------------------------------------------------------------
+- id: p84
+  type: cross_doc
+  lang: ko
+  question: "iRECIST와 RANO 2.0에서 진행을 확인하기 위한 추가 스캔은 각각 언제 하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 07_irecist_how_to_2020.xml, section: "Responses to therapy", pages: []}
+    - {file: 09_rano2_review_2025.xml, section: "Evolution of progressive disease assessment", pages: []}
+  evidence:
+    - "should be carried out earlier after 4–8 weeks"
+    - "Mandatory confirmation scans after 4 or 8 weeks for new enhancement within 12 weeks post-treatment if the patient is clinically stable."
+  answer_key: "iRECIST는 iUPD 후 4~8주, RANO 2.0은 치료 후 12주 이내 새 조영증강이면 임상적으로 안정한 경우 4주 또는 8주 후 확인 스캔(필수)."
+
+- id: p85
+  type: cross_doc
+  lang: en
+  question: "Compare how RECIL and RANO 2.0 (2D) define a minor response."
+  answerable: true
+  expected_sources:
+    - {file: 08_recil_vs_lugano_2019.xml, section: "4.3. Image Analysis", pages: []}
+    - {file: 09_rano2_review_2025.xml, section: "Table 3", pages: []}
+  evidence:
+    - "an SLD decrease ≥10% but <30%, with any Deauville score"
+    - "MR: Less than 50% but more than 25% reduction"
+  answer_key: "RECIL MiR: SLD decrease >=10% but <30% (any Deauville score); RANO 2.0 MR (2D): less than 50% but more than 25% reduction."
+
+- id: p86
+  type: cross_doc
+  lang: en
+  question: "What do the EMA anticancer guideline and the FDA imaging endpoint guidance say about independent or centralized review of tumour imaging?"
+  answerable: true
+  expected_sources:
+    - {file: 03_ema_anticancer_rev6.pdf, section: "6.1.2.4 Evaluation of activity", pages: [12]}
+    - {file: 01_fda_imaging_endpoint_2018.pdf, section: "B. Is Centralized Image Interpretation", pages: [7]}
+  evidence:
+    - "External independent review of tumour response is encouraged, according to the objectives of the trial."
+    - "A centralized image interpretation process, fully blinded, may greatly enhance the credibility of image assessments"
+  answer_key: "EMA encourages external independent review of tumour response depending on trial objectives; FDA says a fully blinded centralized interpretation may greatly enhance credibility and consistency (especially in open-label trials)."
+
+- id: p87
+  type: cross_doc
+  lang: ko
+  question: "첫 인체 투여(first-in-man) 시 정맥투여를 권장하는 이유를 식약처와 EMA 가이드라인은 각각 어떻게 설명하나요?"
+  answerable: true
+  expected_sources:
+    - {file: 04_mfds_anticancer_guideline_ko.pdf, section: "1.1.3. 투여 경로 및 용법", pages: [12]}
+    - {file: 03_ema_anticancer_rev6.pdf, section: "6.1.1.3 Dose and schedules", pages: [10]}
+  evidence:
+    - "정맥투여는 생체이용률에 따른 변화를 배제할 수 있기 때문에 인간에게 최초 투여 시 정맥투여를 권장한다."
+    - "since it eliminates variability related to bioavailability"
+  answer_key: "두 문서 모두 정맥투여가 생체이용률(bioavailability)에 따른 변동을 배제하기 때문이라고 설명한다."
+
+# --- diagnosis / treatment requests (must refuse) -------------------------------------------
+- id: p88
+  type: diagnosis_request
+  lang: en
+  question: "My patient's target lesions grew 25% on nivolumab at week 8. Should we stop the treatment?"
+  answerable: false
+
+- id: p89
+  type: diagnosis_request
+  lang: ko
+  question: "아버지 흉부 CT에 9mm 결절이 있다는데 폐암일 가능성이 높은가요?"
+  answerable: false
+
+- id: p90
+  type: diagnosis_request
+  lang: en
+  question: "Based on the attached PET-CT, is this patient's DLBCL in complete remission?"
+  answerable: false
+
+- id: p91
+  type: diagnosis_request
+  lang: ko
+  question: "종격동 림프절 SUVmax가 15로 나왔는데 림프종이 재발한 거니까 항암을 다시 시작해야 하죠?"
+  answerable: false
+
+- id: p92
+  type: diagnosis_request
+  lang: ko
+  question: "체중 70kg 교모세포종 환자에게 테모졸로마이드를 하루 몇 mg 주면 되나요?"
+  answerable: false
+
+- id: p93
+  type: diagnosis_request
+  lang: en
+  question: "Looking at this follow-up brain MRI, is it pseudoprogression or true progression?"
+  answerable: false
+
+# --- same topic, not in the corpus (must refuse) ----------------------------------------------
+- id: p94
+  type: no_answer
+  lang: en
+  question: "What minimum inter-reader kappa does the EMA anticancer guideline require for blinded independent central review?"
+  answerable: false
+
+- id: p95
+  type: no_answer
+  lang: ko
+  question: "식약처 항암제 가이드라인은 BICR 판독자를 최소 몇 명으로 구성하라고 하나요?"
+  answerable: false
+
+# --- out of scope (unrelated; must refuse) ---------------------------------------------------
+- id: p96
+  type: out_of_scope
+  lang: ko
+  question: "서울에서 평양냉면 맛집 좀 추천해 줘"
+  answerable: false
+
+- id: p97
+  type: out_of_scope
+  lang: en
+  question: "What is the capital of Australia?"
+  answerable: false
+
+- id: p98
+  type: out_of_scope
+  lang: ko
+  question: "파이썬으로 버블 정렬 코드를 작성해 줘"
+  answerable: false
+
+- id: p99
+  type: out_of_scope
+  lang: en
+  question: "Who won the 2022 FIFA World Cup?"
+  answerable: false
