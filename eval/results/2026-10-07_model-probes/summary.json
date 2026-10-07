@@ -1,0 +1,20 @@
+{
+  "items": 22,
+  "models": {
+    "gemma4:e4b": {
+      "correct_as_written": 17,
+      "correct_rotated": 18,
+      "correct_in_both_orders": 17,
+      "unparsed": 0,
+      "image_ct_small": "The imaging modality is Computed Tomography (CT), which is excellent for visualizing bone density. The body region shown is the spine, specifically a cross-section of a vertebral body. The image is presented in the axial (or transverse) anatomical plane."
+    },
+    "medgemma:4b": {
+      "correct_as_written": 14,
+      "correct_rotated": 12,
+      "correct_in_both_orders": 11,
+      "unparsed": 0,
+      "image_ct_small": "The image is a cross-sectional view of the spine, likely from a CT scan. It shows a vertebral body and surrounding structures. The image is in the axial plane."
+    }
+  },
+  "image_probe": "CT_small.dcm (pydicom bundled)"
+}

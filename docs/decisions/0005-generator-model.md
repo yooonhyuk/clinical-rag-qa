@@ -3,6 +3,7 @@
 - 상태: 채택 (2026-10-07)
 - 관련: [이슈 008](../issues/008-partial-answer-on-must-refuse.md), [이슈 010](../issues/010-medgemma-fabricates-no-answer-values.md), [ADR 0004](0004-reranker.md)
 - 결과: `eval/results/2026-10-07_public_bge-m3-vector{,-rerank}-{gemma4-e4b,medgemma-4b}*_8e014ae3/`
+- 원인 분석: [medgemma:4b는 왜 이 RAG에서 약하고, 무엇을 잘하는가](../analysis/medgemma-vs-gemma4.md) (실패 분류, 프롬프트 적합성·closed-book probe, 1차 출처)
 
 ## Context
 
@@ -69,7 +70,8 @@ public 99문항(답 79 / 거절 20). 칸 안의 두 값은 1회 / 2회. 검색 �
 
 - gemma4의 더 작은 변형(e2b 등), medgemma 27B, 다른 계열 모델(받지 않음).
 - CPU 전용 장비(오프라인 번들 대상 linux/amd64)에서의 두 모델 지연. 이전 번들 검증에서 CPU medgemma:4b 생성이 약 26초였다는 기록만 있습니다.
-- 사람 또는 LLM 채점에 의한 답변 품질(키워드·인용 위치 지표만 있음), 프롬프트를 모델별로 조정한 경우.
+- 사람 또는 LLM 채점에 의한 답변 품질(키워드·인용 위치 지표만 있음).
+- 프롬프트를 모델별로 조정한 경우는 벡터 설정에서만 측정했습니다([분석 문서](../analysis/medgemma-vs-gemma4.md)). Gemma 3 형식 프롬프트(`--prompt-variant inline-en`)로 medgemma의 거절 정확도는 90%, 본문 `[n]` 표기는 51/79로 좋아졌지만 keyword·citation accuracy는 그대로였고 p95는 계속 지어냈습니다. 결정은 바뀌지 않습니다.
 - 생성 모델 자체의 진단 요청 거절(분류기를 끈 실행).
 
 ## Consequences

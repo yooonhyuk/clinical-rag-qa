@@ -36,7 +36,7 @@ from app.services.llm_types import (
     ModelRefusalError,
     StructuredOutputError,
 )
-from app.services.prompt_builder import build_rag_prompt
+from app.services.prompt_builder import build_inline_rag_prompt, build_rag_prompt
 from app.services.reranker import Reranker, rerank_chunks
 from app.services.scope_classifier import (
     MVP1_OUT_OF_SCOPE_RE,
@@ -139,6 +139,7 @@ class RagService:
         rerank_candidates: int = 30,
         rerank_min_score: float = 0.0,
         partial_answers: bool = True,
+        inline_instructions: bool = False,
     ) -> None:
         self._embeddings = embeddings
         self._llm = llm
@@ -152,6 +153,8 @@ class RagService:
         self._rerank_candidates = rerank_candidates
         self._rerank_min_score = rerank_min_score
         self._partial_answers = partial_answers
+        # eval-only prompt variant: `system_prompt` goes into the user turn, no system message
+        self._inline_instructions = inline_instructions
 
     @property
     def provider(self) -> str:
@@ -285,11 +288,15 @@ class RagService:
         retrieved: list[RetrievedChunk],
         retrieval_ms: int,
     ) -> AskResult:
-        prompt = build_rag_prompt(question, evidence)
+        if self._inline_instructions:
+            prompt = build_inline_rag_prompt(self._system_prompt, question, evidence)
+            system: str | None = None
+        else:
+            prompt, system = build_rag_prompt(question, evidence), self._system_prompt
         start = time.perf_counter()
         schema_valid = True
         try:
-            answer, usage = await self._llm.generate_answer(prompt, system=self._system_prompt)
+            answer, usage = await self._llm.generate_answer(prompt, system=system)
         except ModelRefusalError as exc:
             result = self._refusal(
                 REFUSAL_MESSAGE,

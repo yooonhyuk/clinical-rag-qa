@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     # Return answers the model flagged as insufficient but that cite evidence, with a caveat
     # (docs/issues/007). False = MVP-1 behaviour: every flagged answer is a MODEL_REFUSED refusal.
     partial_answers: bool = True
+    # Generator prompt. default = rag_prompt.txt as the system prompt (Korean, tuned on
+    # gemma4:e4b). inline-en = EVAL-ONLY probe (docs/analysis/medgemma-vs-gemma4.md): English
+    # instructions + one-shot examples in the user turn, answer in the question's language.
+    rag_prompt_variant: Literal["default", "inline-en"] = "default"
 
     # OUT_OF_SCOPE (clinical-judgement request) detection, see services/scope_classifier.py.
     # embedding = precise regex + kNN margin over rules/scope_exemplars.yaml (default)

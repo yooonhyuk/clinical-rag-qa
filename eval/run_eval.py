@@ -214,6 +214,7 @@ async def run_provider(
                 else {}
             ),
             "partial_answers": settings.partial_answers,
+            "rag_prompt_variant": settings.rag_prompt_variant,
             # eval process (incl. an in-process reranker); Ollama runs in its own process
             "eval_process_max_rss_mb": round(
                 resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
@@ -386,6 +387,11 @@ async def main() -> int:
     parser.add_argument("--rerank-min-score", type=float, help="override RERANK_MIN_SCORE")
     parser.add_argument("--min-relevance-score", type=float, help="override MIN_RELEVANCE_SCORE")
     parser.add_argument("--partial-answers", choices=["on", "off"])
+    parser.add_argument(
+        "--prompt-variant",
+        choices=["default", "inline-en"],
+        help="override RAG_PROMPT_VARIANT (inline-en: eval-only probe, docs/analysis)",
+    )
     parser.add_argument("--scope-classifier", choices=["embedding", "regex", "mvp1"])
     parser.add_argument("--label", help="config label used in the result folder name")
     parser.add_argument("--out", type=Path, default=RESULTS, help="results root")
@@ -404,6 +410,8 @@ async def main() -> int:
         overrides["hybrid_search"] = args.hybrid == "on"
     if args.generator_model:
         overrides["ollama_llm_model"] = args.generator_model
+    if args.prompt_variant:
+        overrides["rag_prompt_variant"] = args.prompt_variant
     if args.scope_classifier:
         overrides["scope_classifier"] = args.scope_classifier
     if args.reranker:

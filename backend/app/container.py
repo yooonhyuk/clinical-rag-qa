@@ -139,7 +139,13 @@ def build_container(
         rag=RagService(
             embeddings,
             generator,
-            system_prompt=load_prompt(settings.prompts_path, "rag_prompt.txt"),
+            system_prompt=load_prompt(
+                settings.prompts_path,
+                "rag_prompt_inline_en.txt"
+                if settings.rag_prompt_variant == "inline-en"
+                else "rag_prompt.txt",
+            ),
+            inline_instructions=settings.rag_prompt_variant == "inline-en",
             min_score=settings.min_relevance_score,
             hybrid=settings.hybrid_search,
             rrf_k=settings.rrf_k,

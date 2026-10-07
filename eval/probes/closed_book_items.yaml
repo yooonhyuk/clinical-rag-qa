@@ -1,0 +1,182 @@
+# Closed-book medical-knowledge probe (docs/analysis/medgemma-vs-gemma4.md).
+#
+# SMALL, SELF-AUTHORED, LOW STATISTICAL POWER: 22 multiple-choice items written for this probe
+# (no dataset download). Each answer is a well-established textbook / criteria-document fact;
+# `source` names where it is defined. Asked WITHOUT retrieval, scored by exact letter match.
+# Not a benchmark: one wrong item moves the score by 4.5 points.
+
+- id: k01
+  lang: en
+  topic: response-criteria
+  source: RECIST 1.1 (Eisenhauer et al., Eur J Cancer 2009)
+  question: "Under RECIST 1.1, partial response (PR) requires at least what decrease in the sum of diameters of target lesions, taking the baseline sum as reference?"
+  options: {A: "10%", B: "20%", C: "30%", D: "50%"}
+  answer: C
+
+- id: k02
+  lang: en
+  topic: response-criteria
+  source: RECIST 1.1
+  question: "Under RECIST 1.1, progressive disease (PD) for target lesions requires which increase in the sum of diameters, taking the smallest sum on study (nadir) as reference?"
+  options: {A: "At least 10% and an absolute increase of at least 3 mm", B: "At least 20% and an absolute increase of at least 5 mm", C: "At least 25% with no absolute requirement", D: "At least 30% and an absolute increase of at least 10 mm"}
+  answer: B
+
+- id: k03
+  lang: en
+  topic: response-criteria
+  source: RECIST 1.1
+  question: "Under RECIST 1.1, what is the minimum longest diameter for a non-nodal lesion to be measurable on CT with slice thickness of 5 mm or less?"
+  options: {A: "5 mm", B: "10 mm", C: "15 mm", D: "20 mm"}
+  answer: B
+
+- id: k04
+  lang: en
+  topic: response-criteria
+  source: RECIST 1.1
+  question: "Under RECIST 1.1, a malignant lymph node is measurable (pathologically enlarged) when which criterion is met on CT?"
+  options: {A: "Long axis >= 10 mm", B: "Short axis >= 10 mm", C: "Short axis >= 15 mm", D: "Long axis >= 20 mm"}
+  answer: C
+
+- id: k05
+  lang: en
+  topic: response-criteria
+  source: RECIST 1.1
+  question: "Under RECIST 1.1, what is the maximum number of target lesions at baseline?"
+  options: {A: "5 in total, at most 2 per organ", B: "10 in total, at most 5 per organ", C: "5 in total, at most 5 per organ", D: "3 in total, at most 1 per organ"}
+  answer: A
+
+- id: k06
+  lang: ko
+  topic: response-criteria
+  source: RECIST 1.1
+  question: "RECIST 1.1에서 완전관해(CR)로 판정하려면 병적 림프절(표적이든 비표적이든)의 단축이 몇 mm 미만으로 줄어야 하나요?"
+  options: {A: "5 mm", B: "10 mm", C: "15 mm", D: "20 mm"}
+  answer: B
+
+- id: k07
+  lang: en
+  topic: response-criteria
+  source: iRECIST (Seymour et al., Lancet Oncol 2017)
+  question: "In iRECIST, how is the first RECIST 1.1-defined progression labelled before it is confirmed?"
+  options: {A: "iCPD", B: "iUPD", C: "iSD", D: "iPR"}
+  answer: B
+
+- id: k08
+  lang: en
+  topic: pet
+  source: Deauville 5-point scale / Lugano 2014 (Cheson et al., J Clin Oncol 2014)
+  question: "On the Deauville 5-point scale, what does a score of 3 mean?"
+  options: {A: "No uptake above background", B: "Uptake <= mediastinum", C: "Uptake > mediastinum but <= liver", D: "Uptake markedly higher than liver and/or new lesions"}
+  answer: C
+
+- id: k09
+  lang: en
+  topic: pet
+  source: Lugano 2014
+  question: "In the Lugano 2014 classification, which Deauville scores (with or without a residual mass) count as complete metabolic response on PET-CT?"
+  options: {A: "1, 2 or 3", B: "4 or 5", C: "Only 1", D: "Only 5"}
+  answer: A
+
+- id: k10
+  lang: ko
+  topic: pet
+  source: Deauville 5-point scale
+  question: "Deauville 5점 척도에서 4점의 정의는 무엇인가요?"
+  options: {A: "배경보다 섭취가 없음", B: "종격동 이하의 섭취", C: "간보다 중등도로 높은 섭취", D: "종격동보다 높지만 간 이하의 섭취"}
+  answer: C
+
+- id: k11
+  lang: en
+  topic: pet
+  source: SUV definition (standard nuclear-medicine textbooks)
+  question: "The body-weight standardized uptake value (SUVbw) normalizes the tissue activity concentration by what?"
+  options: {A: "Blood glucose level", B: "Injected dose and body weight", C: "Lesion volume", D: "Scan duration"}
+  answer: B
+
+- id: k12
+  lang: en
+  topic: pet
+  source: PERCIST 1.0 (Wahl et al., J Nucl Med 2009)
+  question: "PERCIST uses SUL. SUL is SUV normalized to what?"
+  options: {A: "Body surface area", B: "Lean body mass", C: "Total body weight", D: "Blood glucose"}
+  answer: B
+
+- id: k13
+  lang: en
+  topic: contrast
+  source: ACR Manual on Contrast Media
+  question: "Nephrogenic systemic fibrosis (NSF) in patients with severe renal impairment is associated with which contrast agent class?"
+  options: {A: "Iodinated CT contrast", B: "Gadolinium-based MRI contrast", C: "Barium sulfate", D: "Ultrasound microbubbles"}
+  answer: B
+
+- id: k14
+  lang: ko
+  topic: imaging-physics
+  source: Hounsfield scale definition
+  question: "CT의 Hounsfield 척도에서 물의 값은 정의상 얼마인가요?"
+  options: {A: "-1000 HU", B: "0 HU", C: "+100 HU", D: "+1000 HU"}
+  answer: B
+
+- id: k15
+  lang: en
+  topic: imaging-physics
+  source: MRI basics (standard radiology textbooks)
+  question: "On T2-weighted MRI, cerebrospinal fluid typically appears:"
+  options: {A: "Hypointense (dark)", B: "Hyperintense (bright)", C: "Isointense to fat", D: "As a signal void"}
+  answer: B
+
+- id: k16
+  lang: en
+  topic: dicom
+  source: DICOM PS3.6 data dictionary
+  question: "Which attribute does the DICOM tag (0010,0010) identify?"
+  options: {A: "Patient ID", B: "Patient's Name", C: "Study Date", D: "Modality"}
+  answer: B
+
+- id: k17
+  lang: ko
+  topic: terminology
+  source: 대한의사협회 의학용어집
+  question: "'췌장'에 해당하는 영어 의학 용어는?"
+  options: {A: "spleen", B: "pancreas", C: "kidney", D: "gallbladder"}
+  answer: B
+
+- id: k18
+  lang: ko
+  topic: terminology
+  source: 대한의사협회 의학용어집
+  question: "'비장'에 해당하는 영어 의학 용어는?"
+  options: {A: "spleen", B: "pancreas", C: "liver", D: "adrenal gland"}
+  answer: A
+
+- id: k19
+  lang: ko
+  topic: terminology
+  source: 대한의사협회 의학용어집
+  question: "'pulmonary embolism'에 해당하는 한국어 의학 용어는?"
+  options: {A: "폐부종", B: "폐색전증", C: "기흉", D: "흉막삼출"}
+  answer: B
+
+- id: k20
+  lang: en
+  topic: terminology
+  source: 대한의사협회 의학용어집
+  question: "What is the Korean medical term for 'myocardial infarction'?"
+  options: {A: "심근경색", B: "뇌경색", C: "폐색전증", D: "심부전"}
+  answer: A
+
+- id: k21
+  lang: en
+  topic: general-medicine
+  source: standard physiology / nutrition textbooks
+  question: "Deficiency of which vitamin causes scurvy?"
+  options: {A: "Vitamin A", B: "Vitamin B12", C: "Vitamin C", D: "Vitamin D"}
+  answer: C
+
+- id: k22
+  lang: en
+  topic: trial-imaging
+  source: standard oncology-trial term (e.g. FDA imaging endpoint guidance)
+  question: "In oncology trials, what does BICR stand for?"
+  options: {A: "Blinded Independent Central Review", B: "Baseline Imaging Contrast Ratio", C: "Bilateral Imaging Comparison Report", D: "Biomarker-Integrated Clinical Response"}
+  answer: A

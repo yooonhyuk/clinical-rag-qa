@@ -324,3 +324,46 @@ def test_no_reranker_by_default() -> None:
     from app.container import build_reranker
 
     assert build_reranker(Settings(_env_file=None)) is None
+
+
+class _SystemRecordingLlm(FakeOllama):
+    def __init__(self) -> None:
+        super().__init__()
+        self.systems: list[str | None] = []
+
+    async def generate_answer(self, prompt: str, *, system: str | None = None):
+        self.systems.append(system)
+        return await super().generate_answer(prompt, system=system)
+
+
+async def test_default_prompt_sends_instructions_as_system() -> None:
+    llm = _SystemRecordingLlm()
+    await _service(llm, [make_chunk()]).ask(FakeSession(), "질문", top_k=5)
+    assert llm.systems == ["sys"] and "sys" not in llm.generate_calls[0]
+
+
+async def test_inline_prompt_variant_puts_instructions_in_the_user_turn() -> None:
+    llm = _SystemRecordingLlm()
+
+    async def search(session, vector, *, top_k, file_type, **_):
+        return [make_chunk(text="chunk text")]
+
+    rag = RagService(
+        EmbeddingService(llm, dimension=DIM),
+        llm,
+        system_prompt="INSTRUCTIONS",
+        min_score=0.5,
+        search=search,
+        inline_instructions=True,
+    )
+    result = await rag.ask(FakeSession(), "the question?", top_k=5)
+    prompt = llm.generate_calls[0]
+    assert llm.systems == [None] and not result.refused
+    assert prompt.startswith("INSTRUCTIONS")
+    assert prompt.index("[1] Source:") < prompt.index("Question: the question?")
+
+
+def test_prompt_variant_defaults_to_the_tuned_prompt() -> None:
+    from app.config import Settings
+
+    assert Settings(_env_file=None).rag_prompt_variant == "default"
