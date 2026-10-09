@@ -25,10 +25,12 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AskLog
+from app.models import AskLog, Document
 from app.services.embedding_service import EmbeddingService
+from app.services.llm_guardrail import ALLOWED_CLASSIFICATIONS, ExternalLLMNotAllowedError
 from app.services.llm_types import (
     GenerationClient,
     GroundedAnswer,
@@ -119,6 +121,13 @@ def _valid_ids(one_based: Iterable[int], n_chunks: int) -> list[int]:
     return seen
 
 
+async def corpus_classifications(session: AsyncSession, corpus: str) -> set[str | None]:
+    rows = await session.scalars(
+        select(Document.classification).where(Document.corpus == corpus).distinct()
+    )
+    return set(rows.all())
+
+
 def _elapsed_ms(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
 
@@ -140,6 +149,10 @@ class RagService:
         rerank_min_score: float = 0.0,
         partial_answers: bool = True,
         inline_instructions: bool = False,
+        exact_search: bool = False,
+        hnsw_iterative_scan: str = "off",
+        hnsw_ef_search: int | None = None,
+        corpus_lookup: Callable[[AsyncSession, str], Awaitable[set[str | None]]] | None = None,
     ) -> None:
         self._embeddings = embeddings
         self._llm = llm
@@ -155,6 +168,12 @@ class RagService:
         self._partial_answers = partial_answers
         # eval-only prompt variant: `system_prompt` goes into the user turn, no system message
         self._inline_instructions = inline_instructions
+        self._exact_search = exact_search
+        self._iterative_scan = hnsw_iterative_scan
+        self._ef_search = hnsw_ef_search
+        # External generator: only documents of non-sensitive corpora may reach the prompt.
+        self._classifications = None if llm.provider == "ollama" else ALLOWED_CLASSIFICATIONS
+        self._corpus_lookup = corpus_lookup or corpus_classifications
 
     @property
     def provider(self) -> str:
@@ -169,12 +188,25 @@ class RagService:
         file_type: str | None = None,
         corpus: str | None = None,
     ) -> tuple[list[RetrievedChunk], int]:
+        await self._check_corpus(session, corpus)
         start = time.perf_counter()
         query_vector = await self._embeddings.embed_query(question)
         chunks, _, retrieval_ms = await self._retrieve_with(
             session, question, query_vector, start, top_k=top_k, file_type=file_type, corpus=corpus
         )
         return chunks, retrieval_ms
+
+    async def _check_corpus(self, session: AsyncSession, corpus: str | None) -> None:
+        """External generator + a corpus that holds any local-only document -> refuse."""
+        if self._classifications is None or corpus is None:
+            return
+        found = await self._corpus_lookup(session, corpus)
+        blocked = sorted(str(c) for c in found if c not in self._classifications)
+        if blocked:
+            raise ExternalLLMNotAllowedError(
+                f"Corpus {corpus!r} is local-only (classification {blocked}); it cannot be used "
+                "with an external LLM provider."
+            )
 
     async def _retrieve_with(
         self,
@@ -189,6 +221,16 @@ class RagService:
     ) -> tuple[list[RetrievedChunk], float | None, int]:
         """(top_k chunks, best cosine among all candidates, elapsed ms)."""
         n = max(top_k, self._rerank_candidates) if self._reranker else top_k
+        options: dict[str, object] = {}
+        if self._classifications is not None:
+            options["classifications"] = self._classifications
+        if self._exact_search:
+            options["exact"] = True
+        else:
+            if self._iterative_scan != "off":
+                options["iterative_scan"] = self._iterative_scan
+            if self._ef_search is not None:
+                options["ef_search"] = self._ef_search
         chunks = await self._search(
             session,
             query_vector,
@@ -198,6 +240,7 @@ class RagService:
             rrf_k=self._rrf_k,
             embedding_model=self._embeddings.model,
             corpus=corpus,
+            **options,
         )
         # the cosine gate compares the best candidate's cosine (= vector top-1) in both modes
         best_cosine = max((c.score for c in chunks), default=None)
@@ -228,6 +271,7 @@ class RagService:
         file_type: str | None = None,
         corpus: str | None = None,
     ) -> AskResult:
+        await self._check_corpus(session, corpus)
         # Layer 1 (precise regex) refuses before any model call.
         if decision := self._scope.precheck(question):
             return await self._out_of_scope(session, question, decision, retrieval_ms=0)

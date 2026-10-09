@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.api import dicom, documents, health, rag
 from app.config import get_settings
 from app.container import AppContainer, build_container
+from app.services.llm_guardrail import ExternalLLMNotAllowedError
 from app.services.llm_types import LLMError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -36,6 +37,12 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     async def llm_error_handler(_: Request, exc: LLMError) -> JSONResponse:
         return JSONResponse(
             status_code=503, content={"detail": str(exc), "errorType": exc.error_type}
+        )
+
+    @app.exception_handler(ExternalLLMNotAllowedError)
+    async def external_llm_handler(_: Request, exc: ExternalLLMNotAllowedError) -> JSONResponse:
+        return JSONResponse(
+            status_code=403, content={"detail": str(exc), "errorType": "EXTERNAL_LLM_NOT_ALLOWED"}
         )
 
     for module in (health, documents, rag, dicom):

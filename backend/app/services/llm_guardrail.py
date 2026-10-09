@@ -11,6 +11,12 @@ non-sensitive sample corpora. Anthropic mode is allowed only when ALL of these h
 
 Otherwise the app refuses to start. Even in anthropic mode, DICOM-derived data is never sent
 externally (the DICOM explanation uses the deterministic template).
+
+Every indexed document also stores its corpus classification (documents.classification). In
+anthropic mode retrieval only reads documents whose classification is allowed, and a question
+restricted to a local-only corpus (e.g. `licensed-local-only`: copyrighted sponsor protocols
+kept on this machine, see .corpus.yaml.private.example) is rejected before retrieval. So a
+DB that also holds such a corpus never sends its text to an external provider.
 """
 
 from pathlib import Path
@@ -23,40 +29,55 @@ from app.config import Settings
 # (corpus/public). It is allowed for the same reason as synthetic samples - nothing in it is
 # confidential - but the eval in this repo still runs local-only (Ollama).
 ALLOWED_CLASSIFICATIONS = frozenset({"synthetic-sample", "non-sensitive", "public-regulatory"})
+# Named local-only classes (anything not in ALLOWED_CLASSIFICATIONS is local-only as well; these
+# exist so a marker can say *why*). `licensed-local-only`: documents we may read and evaluate
+# on locally but not redistribute or send to a third party (sponsor protocols, journal PDFs).
+LOCAL_ONLY_CLASSIFICATIONS = frozenset({"licensed-local-only", "confidential"})
+
+
+def allows_external(classification: str | None) -> bool:
+    """True only for the explicitly non-sensitive classes; unknown / missing = local only."""
+    return classification in ALLOWED_CLASSIFICATIONS
 
 
 class ExternalLLMNotAllowedError(RuntimeError):
     pass
 
 
-def corpus_classification(root: Path, marker_file: str) -> str | None:
+def read_marker(root: Path, marker_file: str) -> dict:
+    """The parsed `.corpus.yaml` of `root` ({} when missing or invalid)."""
     marker = root / marker_file
     if not marker.is_file():
-        return None
+        return {}
     try:
         data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
-        return None
-    value = data.get("classification") if isinstance(data, dict) else None
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def corpus_classification(root: Path, marker_file: str) -> str | None:
+    value = read_marker(root, marker_file).get("classification")
     return str(value) if value is not None else None
 
 
 def corpus_name(root: Path, marker_file: str) -> str:
     """`name:` from the corpus marker, else the folder name (e.g. "public", "originals")."""
-    marker = root / marker_file
-    if marker.is_file():
-        try:
-            data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError:
-            data = {}
-        if isinstance(data, dict) and data.get("name"):
-            return str(data["name"])
-    return root.name
+    name = read_marker(root, marker_file).get("name")
+    return str(name) if name else root.name
+
+
+def corpus_include(root: Path, marker_file: str) -> tuple[str, ...] | None:
+    """`include:` glob patterns (relative to the corpus root) or None = every file."""
+    value = read_marker(root, marker_file).get("include")
+    if not value:
+        return None
+    return tuple(str(v) for v in (value if isinstance(value, list) else [value]))
 
 
 def ensure_corpus_allows_external(root: Path, marker_file: str) -> None:
     classification = corpus_classification(root, marker_file)
-    if classification not in ALLOWED_CLASSIFICATIONS:
+    if not allows_external(classification):
         raise ExternalLLMNotAllowedError(
             f"Corpus '{root}' is not marked as sample/non-sensitive "
             f"({marker_file} classification={classification!r}; "

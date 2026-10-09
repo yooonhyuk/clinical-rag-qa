@@ -9,12 +9,26 @@ character trigrams, and the two rankings are merged with Reciprocal Rank Fusion.
 
 With `embedding_model` set, only chunks embedded by that model are searched: vectors of
 different models are not comparable (see embedding_schema).
+
+Approximate vs exact (docs/issues/009): the HNSW index returns `hnsw.ef_search` (default 40)
+candidates and only then applies the WHERE filters (corpus, model, classification). When the
+filtered corpus is a minority of the table, fewer than top_k - or different - chunks survive.
+`exact=True` disables index scans for this transaction (sequential scan, exact cosine order);
+`iterative_scan` turns on pgvector 0.8 iterative index scans, which keep scanning the graph
+until enough rows pass the filter; `ef_search` widens the HNSW candidate list (recall).
+
+Whether the index is used at all is the planner's choice: measured on 2026-10-09, a corpus
+filter that keeps a minority of a ~10k-chunk table gives a sequential scan + sort (exact),
+while a DB holding (almost) only that corpus gives an HNSW index scan (approximate), whose
+top-k then depends on the graph, i.e. on insertion order (docs/issues/009).
 """
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
+from typing import Literal
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Chunk, Document, DocumentStatus
@@ -69,8 +83,24 @@ async def search_chunks(
     rrf_k: int = 60,
     embedding_model: str | None = None,
     corpus: str | None = None,
+    classifications: Collection[str] | None = None,
+    exact: bool = False,
+    iterative_scan: Literal["off", "relaxed_order", "strict_order"] = "off",
+    ef_search: int | None = None,
 ) -> list[RetrievedChunk]:
-    """Vector-only search, or hybrid (vector + pg_trgm, RRF) when `query_text` is given."""
+    """Vector-only search, or hybrid (vector + pg_trgm, RRF) when `query_text` is given.
+
+    `classifications` (external-LLM mode) keeps only documents with one of these corpus
+    classifications; documents without one are excluded.
+    """
+    if exact:
+        await session.execute(text("SET LOCAL enable_indexscan = off"))
+    elif iterative_scan != "off":
+        if iterative_scan not in ("relaxed_order", "strict_order"):
+            raise ValueError(f"invalid hnsw.iterative_scan: {iterative_scan!r}")
+        await session.execute(text(f"SET LOCAL hnsw.iterative_scan = {iterative_scan}"))
+    if ef_search is not None and not exact:
+        await session.execute(text(f"SET LOCAL hnsw.ef_search = {int(ef_search)}"))
     distance = Chunk.embedding.cosine_distance(query_embedding)
     columns = [Chunk, Document.file_name, (1 - distance).label("score")]
     lexical = func.word_similarity(query_text, Chunk.text) if query_text else None
@@ -88,6 +118,8 @@ async def search_chunks(
         stmt = stmt.where(Chunk.embedding_model == embedding_model)
     if corpus is not None:
         stmt = stmt.where(Document.corpus == corpus)
+    if classifications is not None:
+        stmt = stmt.where(Document.classification.in_(sorted(classifications)))
 
     if lexical is None:
         rows = (await session.execute(stmt.order_by(distance).limit(top_k))).all()

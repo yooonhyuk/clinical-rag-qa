@@ -1,0 +1,12 @@
+# LOCAL-ONLY private corpus (copyrighted protocols / SAPs, ~/clinical-rag-private) for the UI:
+#   make up-private          (= host Ollama + this file)
+# The folder is mounted read-only into the api container and becomes indexable through
+# /api/index and the UI's "코퍼스 폴더" selector. Its .corpus.yaml says
+# `classification: licensed-local-only`, so with an external LLM provider these documents are
+# never searched and questions restricted to the corpus are rejected (llm_guardrail).
+services:
+  api:
+    environment:
+      PRIVATE_CORPUS_PATH: /private-corpus
+    volumes:
+      - ${PRIVATE_CORPUS_DIR:-~/clinical-rag-private}:/private-corpus:ro

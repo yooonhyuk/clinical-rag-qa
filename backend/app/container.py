@@ -154,6 +154,9 @@ def build_container(
             rerank_candidates=settings.rerank_candidates,
             rerank_min_score=settings.rerank_min_score,
             partial_answers=settings.partial_answers,
+            exact_search=settings.vector_search == "exact",
+            hnsw_iterative_scan=settings.hnsw_iterative_scan,
+            hnsw_ef_search=settings.hnsw_ef_search,
         ),
         dicom=DicomService(
             dicom_llm,

@@ -1,0 +1,12 @@
+# Template for the LOCAL-ONLY corpus marker. Copy to <your private folder>/.corpus.yaml
+# (default ~/clinical-rag-private, filled by scripts/fetch-protocols.sh and fetch-originals.sh).
+# Never put the folder itself inside this repository.
+
+# LOCAL ONLY. Copyrighted sponsor protocols / SAPs (ClinicalTrials.gov large documents) and
+# journal / QIBA originals. Readable and evaluable on this machine, not redistributable, and
+# never sent to an external LLM provider (llm_guardrail: licensed-local-only).
+name: private
+classification: licensed-local-only
+include:
+  - "protocols/*.pdf"
+  - "originals/*.pdf"

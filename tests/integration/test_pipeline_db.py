@@ -173,3 +173,41 @@ async def test_corpora_are_tagged_and_search_can_be_restricted(
     assert {c.file_name for c in other_only} == {"07_irecist_how_to_2020.xml"}
     assert all(c.page_number is None for c in other_only)
     assert any("Table" in (c.section_title or "") or c.section_title for c in other_only)
+
+
+async def test_classification_is_stored_and_filters_external_search(
+    session_factory, sample_docs_dir, tmp_path
+) -> None:
+    """A licensed-local-only folder (marker with include globs) next to the toy corpus."""
+    from app.services.llm_guardrail import ALLOWED_CLASSIFICATIONS
+
+    private = tmp_path / "private"
+    (private / "protocols").mkdir(parents=True)
+    shutil.copy(PUBLIC / "07_irecist_how_to_2020.xml", private / "protocols")
+    (private / "protocols" / "manifest.txt").write_text("NCT00000000 Prot_000.pdf\n")
+    (private / ".corpus.yaml").write_text(
+        "name: private\nclassification: licensed-local-only\ninclude: ['protocols/*.xml']\n"
+    )
+    pipeline = _pipeline(session_factory, FakeOllama())
+    await pipeline.run(sample_docs_dir)
+    job = await pipeline.run(private)
+    assert job.total == 1  # manifest.txt is outside the include globs
+
+    async with session_factory() as s:
+        rows = (await s.execute(select(Document.corpus, Document.classification))).all()
+    assert set(rows) == {("toy", "synthetic-sample"), ("private", "licensed-local-only")}
+
+    vector = (await FakeOllama().embed(["iRECIST iUPD iCPD confirmation"]))[0]
+    async with session_factory() as s:
+        external = await search_chunks(
+            s, vector, top_k=200, classifications=ALLOWED_CLASSIFICATIONS
+        )
+    async with session_factory() as s:
+        exact = await search_chunks(s, vector, top_k=200, exact=True)
+    async with session_factory() as s:
+        iterative = await search_chunks(
+            s, vector, top_k=10, corpus="private", iterative_scan="relaxed_order"
+        )
+    assert "07_irecist_how_to_2020.xml" not in {c.file_name for c in external}
+    assert "07_irecist_how_to_2020.xml" in {c.file_name for c in exact}
+    assert {c.file_name for c in iterative} == {"07_irecist_how_to_2020.xml"}

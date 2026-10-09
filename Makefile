@@ -3,6 +3,7 @@ UV      := uv run --project backend
 RUFF    := $(UV) ruff
 COMPOSE := docker compose
 HOST_OLLAMA := docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml
+PRIVATE     := $(HOST_OLLAMA) -f docker-compose.private.yml
 OFFLINE := docker compose -f docker-compose.yml -f docker-compose.offline.yml
 LLM_MODEL       ?= gemma4:e4b
 EMBEDDING_MODEL ?= bge-m3
@@ -12,7 +13,8 @@ EVAL_OLLAMA_URL   ?= http://localhost:11434
 
 .PHONY: help setup samples seed lint format test test-unit test-integration \
         up up-host-ollama down logs pull-models migrate reset-embeddings index eval scope-eval api ui bundle offline-up verify-offline \
-        dicom-scan dicom-rules corpus-verify fetch-originals
+        dicom-scan dicom-rules corpus-verify fetch-originals fetch-protocols up-private \
+        index-folder eval-private
 
 help:  ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-18s %s\n",$$1,$$2}'
@@ -35,6 +37,11 @@ corpus-verify:  ## check corpus/public against corpus/SHA256SUMS
 ORIGINALS_DIR ?= $(HOME)/clinical-rag-private/originals
 fetch-originals:  ## LOCAL ONLY: download copyrighted originals to ORIGINALS_DIR (never into the repo)
 	./scripts/fetch-originals.sh $(ORIGINALS_DIR)
+
+PRIVATE_DIR   ?= $(HOME)/clinical-rag-private
+PROTOCOLS_DIR ?= $(PRIVATE_DIR)/protocols
+fetch-protocols:  ## LOCAL ONLY: download ClinicalTrials.gov protocols/SAPs to PROTOCOLS_DIR
+	./scripts/fetch-protocols.sh $(PROTOCOLS_DIR)
 
 dicom-scan:  ## Layer 1/2 DICOM check over a folder: make dicom-scan DIR=path [SCAN_ARGS="--json out.jsonl"]
 	$(UV) python -m app.cli.dicom_scan $(or $(DIR),samples/dicom) $(SCAN_ARGS)
@@ -66,9 +73,13 @@ up:  ## build and start api, ui, db, ollama
 up-host-ollama:  ## build and start api, ui, db using the host's Ollama (no ollama container, no pulls)
 	$(HOST_OLLAMA) up -d --build --wait
 
+up-private:  ## host-Ollama stack + PRIVATE_DIR mounted read-only (local-only corpus in the UI)
+	PRIVATE_CORPUS_DIR=$(PRIVATE_DIR) $(PRIVATE) up -d --build --wait
+
 down:  ## stop the stack (online, host-ollama or offline; volumes are kept)
 	$(COMPOSE) down --remove-orphans
 	$(OFFLINE) down --remove-orphans
+	PRIVATE_CORPUS_DIR=$(PRIVATE_DIR) $(PRIVATE) down --remove-orphans
 
 logs:
 	$(COMPOSE) logs -f api
@@ -90,6 +101,15 @@ eval:  ## RAG eval -> eval/results/ (DB + Ollama reachable). CORPUS=toy|public|<
 	DATABASE_URL=$(EVAL_DATABASE_URL) OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) \
 	$(UV) python eval/run_eval.py $(foreach p,$(or $(PROVIDERS),ollama),--provider $(p)) \
 	$(if $(CORPUS),--corpus $(CORPUS)) $(EVAL_ARGS)
+
+index-folder:  ## index DIR in-process (chunks per doc + time): make index-folder DIR=~/clinical-rag-private
+	DATABASE_URL=$(EVAL_DATABASE_URL) OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) \
+	$(UV) python scripts/index_corpus.py $(DIR)
+
+eval-private:  ## LOCAL ONLY eval on PRIVATE_DIR (full results stay there; eval/results gets aggregates)
+	DATABASE_URL=$(EVAL_DATABASE_URL) OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) \
+	$(UV) python eval/run_eval.py --corpus $(PRIVATE_DIR) \
+	--questions $(PRIVATE_DIR)/eval/protocol_questions.yaml --run-name private-protocols $(EVAL_ARGS)
 
 scope-eval:  ## B6: OUT_OF_SCOPE classifier precision/recall on eval/scope_heldout.yaml (host Ollama)
 	OLLAMA_BASE_URL=$(EVAL_OLLAMA_URL) $(UV) python eval/run_scope_eval.py

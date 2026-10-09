@@ -27,3 +27,19 @@ def test_identical_content_has_identical_checksum(tmp_path: Path) -> None:
 def test_missing_folder_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         scan_documents(tmp_path / "nope")
+
+
+def test_include_globs_limit_the_scan(tmp_path: Path) -> None:
+    """A private corpus folder also holds manifests, checksums and eval files."""
+    (tmp_path / "protocols").mkdir()
+    (tmp_path / "originals").mkdir()
+    (tmp_path / "eval").mkdir()
+    for rel in ("protocols/a.pdf", "originals/b.pdf", "protocols/manifest.txt", "eval/q.yaml"):
+        (tmp_path / rel).write_bytes(rel.encode())
+    (tmp_path / "SHA256SUMS").write_text("x")
+    files = scan_documents(tmp_path, ("protocols/*.pdf", "originals/*.pdf"))
+    assert [f.path.relative_to(tmp_path).as_posix() for f in files] == [
+        "originals/b.pdf",
+        "protocols/a.pdf",
+    ]
+    assert len(scan_documents(tmp_path)) == 5  # no include = every non-hidden file

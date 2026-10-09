@@ -15,6 +15,7 @@ class DocumentOut(CamelModel):
     status: str
     chunk_count: int
     corpus: str | None = None
+    classification: str | None = None
     error_type: str | None = None
     error_message: str | None = None
     created_at: datetime
@@ -43,3 +44,26 @@ class IndexResponse(CamelModel):
     failed: int
     skipped_duplicate: int
     details: list[dict[str, Any]]
+
+
+class CorpusOut(CamelModel):
+    name: str | None
+    classification: str | None
+    documents: int
+    chunks: int
+    # may this corpus reach an external LLM provider (llm_guardrail.allows_external)
+    external_allowed: bool
+
+
+class IndexableFolderOut(CamelModel):
+    name: str
+    path: str
+    classification: str | None
+    external_allowed: bool
+
+
+class CorpusListResponse(CamelModel):
+    corpora: list[CorpusOut]
+    # folders the API may index, with their marker (toy / public / the private corpus if set)
+    folders: list[IndexableFolderOut]
+    llm_provider: str

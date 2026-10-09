@@ -35,13 +35,21 @@ def sha256_of(path: Path, chunk_size: int = 1 << 20) -> str:
     return digest.hexdigest()
 
 
-def scan_documents(root: Path) -> list[DiscoveredFile]:
-    """Recursively list every non-hidden file under `root`, sorted by path."""
+def scan_documents(root: Path, include: tuple[str, ...] | None = None) -> list[DiscoveredFile]:
+    """Recursively list every non-hidden file under `root`, sorted by path.
+
+    `include` (from the corpus marker) limits the scan to files matching any of the glob
+    patterns relative to `root`, e.g. ("protocols/*.pdf", "originals/*.pdf"): a corpus folder
+    can then also hold manifests, checksums and eval files that are not documents.
+    """
     if not root.is_dir():
         raise FileNotFoundError(f"Document folder not found: {root}")
     files: list[DiscoveredFile] = []
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
-        if any(part.startswith(".") for part in path.relative_to(root).parts):
+        relative = path.relative_to(root)
+        if any(part.startswith(".") for part in relative.parts):
+            continue
+        if include is not None and not any(relative.match(pattern) for pattern in include):
             continue
         suffix = path.suffix.lower()
         file_type = SUPPORTED_EXTENSIONS.get(suffix)

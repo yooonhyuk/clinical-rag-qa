@@ -32,7 +32,17 @@ def api(method: str, path: str, **kwargs: Any) -> dict[str, Any] | None:
 
 st.set_page_config(page_title="ClinicalRAG QA", layout="wide")
 st.title("ClinicalRAG QA")
-st.caption("Local-first 의료문서 RAG + DICOM Tag Analyzer — 가상 샘플 데이터 전용 데모")
+st.caption(
+    "Local-first 의료문서 RAG + DICOM Tag Analyzer — toy / public / 로컬 전용(private) 코퍼스"
+)
+
+
+def corpus_label(name: str | None, classification: str | None, external_allowed: bool) -> str:
+    scope = "외부 LLM 허용 가능" if external_allowed else "로컬 전용"
+    return f"{name or '(이름 없음)'} · {classification or '분류 없음'} · {scope}"
+
+
+corpora_info = api("GET", "/api/corpora") or {"corpora": [], "folders": [], "llmProvider": "?"}
 
 with st.sidebar:
     st.subheader("System health")
@@ -78,7 +88,17 @@ with tab_docs:
             st.info("인덱싱된 문서가 없습니다.")
 
 with tab_index:
-    path = st.text_input("인덱싱할 폴더 (비우면 RAW_DOCS_PATH)", value="")
+    folders = corpora_info["folders"]
+    presets = {
+        corpus_label(f["name"], f["classification"], f["externalAllowed"]): f["path"]
+        for f in folders
+    }
+    choice = st.selectbox("코퍼스 폴더", ["직접 입력", *presets])
+    if choice == "직접 입력":
+        path = st.text_input("인덱싱할 폴더 (비우면 RAW_DOCS_PATH)", value="")
+    else:
+        path = presets[choice]
+        st.caption(f"`{path}` — 폴더의 .corpus.yaml이 이름·분류·포함할 파일을 정합니다.")
     if st.button("인덱싱 실행", type="primary"):
         with st.spinner("문서 파싱 → chunk → embedding → 저장 중..."):
             job = api("POST", "/api/index", json={"path": path or None})
@@ -97,11 +117,33 @@ with tab_ask:
     question = st.text_area(
         "질문", placeholder="DICOM 업로드 실패 시 운영자가 먼저 확인해야 할 항목은?"
     )
+    indexed = {
+        corpus_label(c["name"], c["classification"], c["externalAllowed"]): c
+        for c in corpora_info["corpora"]
+        if c["name"]
+    }
+    selected_corpus = st.selectbox(
+        "코퍼스",
+        ["전체", *indexed],
+        format_func=lambda k: (
+            k
+            if k == "전체"
+            else f"{k} ({indexed[k]['documents']}개 문서, {indexed[k]['chunks']} chunk)"
+        ),
+        help="검색을 한 코퍼스로 제한합니다. 로컬 전용 코퍼스는 외부 LLM 모드에서 거부됩니다.",
+    )
+    corpus = None if selected_corpus == "전체" else indexed[selected_corpus]["name"]
+    if corpus and not indexed[selected_corpus]["externalAllowed"]:
+        st.caption(
+            "로컬 전용 코퍼스: 답변은 로컬 Ollama에서만 생성되고, 외부 LLM 모드에서는 "
+            "이 코퍼스의 문서가 검색되지 않습니다."
+        )
     top_k = st.slider("top-k", 1, 10, 5)
     if st.button("질문하기", type="primary") and question.strip():
+        body = {"question": question, "topK": top_k, "corpus": corpus}
         with st.spinner("검색 및 답변 생성 중..."):
-            result = api("POST", "/api/ask", json={"question": question, "topK": top_k})
-            retrieved = api("POST", "/api/retrieve", json={"question": question, "topK": top_k})
+            result = api("POST", "/api/ask", json=body)
+            retrieved = api("POST", "/api/retrieve", json=body)
         if result:
             if result["refused"]:
                 st.warning(f"거절됨 ({result['refusalReason']})")
@@ -110,7 +152,11 @@ with tab_ask:
             st.markdown(result["answer"])
             st.subheader("출처")
             for s in result["sources"]:
-                loc = f"p.{s['pageNumber']}" if s.get("pageNumber") else s.get("sectionTitle") or ""
+                loc = " · ".join(
+                    x
+                    for x in (s.get("sectionTitle"), s.get("pageNumber") and f"p.{s['pageNumber']}")
+                    if x
+                )
                 st.write(f"- {s['fileName']} / {loc} (chunk {s['chunkIndex']}, score {s['score']})")
             if not result["sources"]:
                 st.write("- (없음)")

@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     # on for embedding models without Korean vocabulary.
     hybrid_search: bool = False
     rrf_k: int = Field(default=60, ge=1)
+    # docs/issues/009: hnsw = approximate (index, default), exact = sequential scan with exact
+    # cosine order (slower; reproducible regardless of what else is in the table).
+    vector_search: Literal["hnsw", "exact"] = "hnsw"
+    # pgvector 0.8 iterative index scans: keep scanning until filtered rows fill top_k.
+    hnsw_iterative_scan: Literal["off", "relaxed_order", "strict_order"] = "off"
+    # HNSW candidate list size (pgvector default 40). Larger = closer to exact, slower.
+    hnsw_ef_search: int | None = Field(default=None, ge=1, le=1000)
 
     # Optional cross-encoder reranking (B7, needs `uv sync --extra rerank` and the model files in
     # the local Hugging Face cache or RERANKER_MODEL=<folder>). See services/reranker.py and
@@ -113,8 +120,22 @@ class Settings(BaseSettings):
     samples_path: Path = Path("./samples")
     # Repo corpora (corpus/public, ...). Readable by /api/index like samples.
     corpora_path: Path = Path("./corpus")
+    # Optional LOCAL-ONLY corpus folder outside the repo (e.g. ~/clinical-rag-private with a
+    # `.corpus.yaml` classification: licensed-local-only). Added to the folders /api/index may
+    # read; its documents are never searched in external-LLM mode (llm_guardrail).
+    private_corpus_path: Path | None = None
     rules_path: Path = _APP_DIR / "rules"
     prompts_path: Path = _APP_DIR / "prompts"
+
+    @field_validator("hnsw_ef_search", mode="before")
+    @classmethod
+    def _blank_ef_means_default(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("private_corpus_path", mode="before")
+    @classmethod
+    def _blank_path_means_none(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("embedding_dim", mode="before")
     @classmethod
@@ -152,7 +173,9 @@ class Settings(BaseSettings):
     @property
     def allowed_roots(self) -> list[Path]:
         """Directories the API is allowed to read from (path traversal guard)."""
-        roots = (self.raw_docs_path, self.dicom_path, self.samples_path, self.corpora_path)
+        roots = [self.raw_docs_path, self.dicom_path, self.samples_path, self.corpora_path]
+        if self.private_corpus_path is not None:
+            roots.append(self.private_corpus_path.expanduser())
         return [p.resolve() for p in roots]
 
 

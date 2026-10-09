@@ -35,6 +35,10 @@ class Document(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     # Corpus name (`.corpus.yaml` name:, else folder name): toy / public / private ...
     # NULL for rows indexed before Alembic 0005. Search can be restricted to one corpus.
     corpus: Mapped[str | None] = mapped_column(Text)
+    # `.corpus.yaml` classification at index time (synthetic-sample / public-regulatory /
+    # licensed-local-only ...). With an external LLM provider only allowed classes are searched;
+    # NULL (no marker, or indexed before Alembic 0006) counts as local-only.
+    classification: Mapped[str | None] = mapped_column(Text)
 
     chunks: Mapped[list["Chunk"]] = relationship(  # noqa: F821
         back_populates="document", cascade="all, delete-orphan", passive_deletes=True

@@ -79,10 +79,11 @@ def test_pdf_headings_split_sections_and_chunks_cite_their_page(tmp_path: Path) 
     )
     sections = extract(path, "pdf")
     titles = [s.section_title for s in sections]
+    # numbers decide the parent: "4.2" is not a child of "1 Background"
     assert titles == [
         "1 Background",
-        "1 Background > 4.2 Evaluation of activity",
-        "1 Background > 4.2 Evaluation of activity > 4.2.1 Sub point",
+        "4.2 Evaluation of activity",
+        "4.2 Evaluation of activity > 4.2.1 Sub point",
     ]
     assert [s.page_number for s in sections] == [1, 2, 3]
     # the running header repeats on every page and is removed

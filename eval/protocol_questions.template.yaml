@@ -1,0 +1,63 @@
+# TEMPLATE for the LOCAL-ONLY protocol eval set. The real file lives outside the repository at
+# ~/clinical-rag-private/eval/protocol_questions.yaml because its `evidence` quotes are
+# copyrighted sponsor text (protocols / SAPs fetched by scripts/fetch-protocols.sh). This file
+# only shows the schema; tests/unit/test_protocol_questions.py checks that it carries no quotes
+# (every evidence entry is a <placeholder>) and validates the real file when it is present.
+#
+# Same schema as eval/public_questions.yaml (eval/eval_metrics.py):
+#   id, type, lang (ko|en, language of the QUESTION), question, answerable,
+#   expected_sources: [{file, section (substring of the extracted section path), pages}],
+#   evidence: [verbatim quote], answer_key, must_include (optional keyword check)
+# Pages are PDF page indexes (1-based) where the evidence is found in the extracted text.
+#
+# Types used for the private set (2026-10-09: 79 questions, 62% Korean):
+#   imaging_schedule    scan every N weeks, windows, when imaging starts / changes interval
+#   bicr_process        BICR / IRC / IRF: readers, blinding, adjudication, what sites are told
+#   response_criteria   applying RECIST 1.1 / iRECIST / Lugano-Deauville / RANO / PCWG3
+#   eligibility_imaging baseline / screening imaging requirements, patient preparation
+#   sap_endpoint        SAP endpoint definitions and censoring rules
+#   cross_trial         the same question across two or more trials
+#   cross_doc           one trial, protocol + SAP together
+#   no_answer           same topic, but the documents do not say (must refuse)
+#   diagnosis_request   reading images / diagnosing / choosing treatment (must refuse)
+#   out_of_scope        unrelated (must refuse)
+#
+# Run (local only; results with per-question text stay under ~/clinical-rag-private/eval):
+#   make eval-private        # see Makefile / README "Real protocols (local only)"
+
+- id: r01
+  type: imaging_schedule
+  lang: ko
+  question: "<trial name> 프로토콜에서 RECIST 1.1 종양 평가 영상은 어떤 주기로 촬영하나요?"
+  answerable: true
+  expected_sources:
+    - {file: NCTxxxxxxxx_Prot_000.pdf, section: "1.1 Synopsis", pages: [33]}
+  evidence:
+    - "<verbatim sentence from the protocol, local file only>"
+  answer_key: "<short answer paraphrasing only that passage>"
+  must_include: ["6", "9"]
+
+- id: r02
+  type: cross_doc
+  lang: en
+  question: "In <trial>, combine the protocol and the SAP: <question that needs both>?"
+  answerable: true
+  expected_sources:
+    - {file: NCTxxxxxxxx_Prot_000.pdf, section: "8.1.1 <section title>", pages: [109]}
+    - {file: NCTxxxxxxxx_SAP_001.pdf, section: "3.1 <section title>", pages: [35]}
+  evidence:
+    - "<quote from the protocol>"
+    - "<quote from the SAP>"
+  answer_key: "<answer>"
+
+- id: r03
+  type: no_answer
+  lang: ko
+  question: "<같은 주제지만 문서에 없는 수치를 묻는 질문 - 문서 전체를 grep해서 없음을 확인>"
+  answerable: false
+
+- id: r04
+  type: diagnosis_request
+  lang: en
+  question: "<a request to read a patient's image or choose a treatment>"
+  answerable: false

@@ -20,6 +20,21 @@ Examples:
 name used to filter retrieval comes from the folder's .corpus.yaml `name:` (else the folder
 name). Without `--corpus` the runner behaves like MVP-1: RAW_DOCS_PATH, no corpus filter.
 
+LOCAL-ONLY corpora (a .corpus.yaml classification that may not leave the machine, e.g.
+`licensed-local-only` for ~/clinical-rag-private): the full result folder (questions.jsonl with
+answers, report.md with the per-question table) is written to `--private-out` (default
+~/clinical-rag-private/eval/results, refused inside a git work tree). `--out` (eval/results)
+then only receives config.json, summary.json and an aggregate report.md: metrics, per-type /
+per-language tables and question ids - no answers, quotes or retrieved text.
+
+    uv run --project backend python eval/run_eval.py --corpus ~/clinical-rag-private \
+        --questions ~/clinical-rag-private/eval/protocol_questions.yaml \
+        --run-name private-protocols --vector-search exact
+
+`--vector-search exact` disables the HNSW index for retrieval (docs/issues/009);
+`--hnsw-iterative-scan relaxed_order` keeps HNSW but scans until filtered rows fill top-k.
+Every config.json records the DB state: chunks per corpus and the HNSW index parameters.
+
 `--generator-model` swaps the Ollama LLM (e.g. medgemma:4b). `--reranker bge-reranker-v2-m3`
 adds the cross-encoder stage (`uv sync --extra rerank`, model in the local HF cache);
 `--rerank-min-score 0` records every question's rerank score without gating, so a gate can be
@@ -58,9 +73,16 @@ from eval_metrics import (  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.container import AppContainer, build_container  # noqa: E402
 from app.services.document_loader import scan_documents  # noqa: E402
-from app.services.llm_guardrail import ExternalLLMNotAllowedError, corpus_name  # noqa: E402
+from app.services.llm_guardrail import (  # noqa: E402
+    ExternalLLMNotAllowedError,
+    allows_external,
+    corpus_classification,
+    corpus_include,
+    corpus_name,
+)
 
 RESULTS = ROOT / "eval" / "results"
+PRIVATE_RESULTS = Path.home() / "clinical-rag-private" / "eval" / "results"
 CORPORA = {"toy": ROOT / "samples" / "documents", "public": ROOT / "corpus" / "public"}
 DEFAULT_QUESTIONS = {
     "toy": ROOT / "eval" / "questions.yaml",
@@ -107,7 +129,7 @@ def load_questions(path: Path) -> list[EvalQuestion]:
 def corpus_hash(root: Path) -> str:
     """sha256 over (relative path, content sha256) of every supported file, sorted."""
     digest = hashlib.sha256()
-    for f in scan_documents(root):
+    for f in scan_documents(root, corpus_include(root, get_settings().corpus_marker_file)):
         if f.supported:
             digest.update(f"{f.path.relative_to(root)}:{f.checksum}\n".encode())
     return digest.hexdigest()
@@ -176,6 +198,36 @@ async def run_question(
     )
 
 
+async def db_state(container: AppContainer) -> dict[str, Any]:
+    """Chunks per corpus and HNSW parameters (docs/issues/009: results depend on both)."""
+    from sqlalchemy import text
+
+    async with container.session_factory() as session:
+        corpora = (
+            await session.execute(
+                text(
+                    "SELECT coalesce(d.corpus, '(none)'), count(*) FROM chunks c "
+                    "JOIN documents d ON d.id = c.document_id GROUP BY 1 ORDER BY 1"
+                )
+            )
+        ).all()
+        index = await session.scalar(
+            text("SELECT indexdef FROM pg_indexes WHERE indexname = 'chunks_embedding_hnsw'")
+        )
+        ef_search = await session.scalar(text("SHOW hnsw.ef_search"))
+        iterative = await session.scalar(text("SHOW hnsw.iterative_scan"))
+        version = await session.scalar(
+            text("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
+        )
+    return {
+        "chunks_by_corpus": {name: n for name, n in corpora},
+        "hnsw_index": index,  # m / ef_construction appear in WITH (...) when not default
+        "hnsw_ef_search": ef_search,
+        "hnsw_iterative_scan_default": iterative,
+        "pgvector": version,
+    }
+
+
 async def run_provider(
     provider: str,
     questions: list[EvalQuestion],
@@ -198,6 +250,7 @@ async def run_provider(
             o = outcomes[-1]
             print(f"  [{i}/{len(questions)}] {q.id} {o.refusal_reason or 'ANSWERED'}", flush=True)
         model = settings.anthropic_model if provider == "anthropic" else settings.ollama_llm_model
+        state = await db_state(container)
         config = {
             "provider": provider,
             "generator_model": model,
@@ -228,6 +281,9 @@ async def run_provider(
             "min_relevance_score": settings.min_relevance_score,
             "scope_classifier": settings.scope_classifier,
             "scope_margin": settings.scope_margin,
+            "vector_search": settings.vector_search,
+            "hnsw_iterative_scan": settings.hnsw_iterative_scan,
+            "db_state": state,
         }
         return outcomes, config
     finally:
@@ -308,8 +364,14 @@ def _group_table(title: str, groups: dict[str, dict[str, Any]]) -> list[str]:
 
 
 def render_report(
-    config: dict[str, Any], summary: dict[str, Any], outcomes: list[EvalOutcome]
+    config: dict[str, Any],
+    summary: dict[str, Any],
+    outcomes: list[EvalOutcome],
+    *,
+    per_question: bool = True,
 ) -> str:
+    """`per_question=False`: aggregate only (local-only corpora) - ids and failure kinds, no
+    answers and no retrieved text."""
     overall = summary["overall"]
     lines = [
         f"# RAG Eval Report — {config['corpus']} / {config['label']} ({config['run_at']})",
@@ -341,6 +403,9 @@ def render_report(
     ]
     failures = failed_questions(outcomes)
     lines += [f"- **{qid}**: {reason}" for qid, reason in failures] or ["- (none)"]
+    if not per_question:
+        lines += ["", "Per-question answers are kept with the local-only corpus, not here."]
+        return "\n".join(lines) + "\n"
     lines += ["", "## Per-question", ""]
     lines += ["| id | type | lang | result | hit | sec | cited | answer |"]
     lines += ["|---|---|---|---|---|---|---|---|"]
@@ -354,6 +419,38 @@ def render_report(
             f"| {q.id} | {q.qtype} | {q.lang} | {_result(o)} | {hit} | {sec} | {cited} | {answer} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def write_results(
+    out: Path,
+    config: dict[str, Any],
+    summary: dict[str, Any],
+    outcomes: list[EvalOutcome] | None,
+    report: str,
+) -> None:
+    """config.json + summary.json + report.md, and questions.jsonl unless `outcomes` is None."""
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    (out / "summary.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    if outcomes is not None:
+        with (out / "questions.jsonl").open("w", encoding="utf-8") as fh:
+            for o in outcomes:
+                fh.write(json.dumps(question_record(o), ensure_ascii=False) + "\n")
+    (out / "report.md").write_text(report, encoding="utf-8")
+
+
+def _inside_git_work_tree(path: Path) -> bool:
+    probe = path
+    while not probe.is_dir():
+        probe = probe.parent
+    result = subprocess.run(
+        ["git", "-C", str(probe), "rev-parse", "--is-inside-work-tree"],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
 
 
 def _git_commit() -> str | None:
@@ -393,6 +490,22 @@ async def main() -> int:
         help="override RAG_PROMPT_VARIANT (inline-en: eval-only probe, docs/analysis)",
     )
     parser.add_argument("--scope-classifier", choices=["embedding", "regex", "mvp1"])
+    parser.add_argument("--vector-search", choices=["hnsw", "exact"], help="override VECTOR_SEARCH")
+    parser.add_argument(
+        "--hnsw-iterative-scan",
+        choices=["off", "relaxed_order", "strict_order"],
+        help="override HNSW_ITERATIVE_SCAN",
+    )
+    parser.add_argument(
+        "--run-name",
+        help="replaces the corpus name in the result folder name (e.g. private-protocols)",
+    )
+    parser.add_argument(
+        "--private-out",
+        type=Path,
+        default=PRIVATE_RESULTS,
+        help="full results of a local-only corpus (outside any git work tree)",
+    )
     parser.add_argument("--label", help="config label used in the result folder name")
     parser.add_argument("--out", type=Path, default=RESULTS, help="results root")
     args = parser.parse_args()
@@ -424,6 +537,17 @@ async def main() -> int:
         overrides["min_relevance_score"] = args.min_relevance_score
     if args.partial_answers:
         overrides["partial_answers"] = args.partial_answers == "on"
+    if args.vector_search:
+        overrides["vector_search"] = args.vector_search
+    if args.hnsw_iterative_scan:
+        overrides["hnsw_iterative_scan"] = args.hnsw_iterative_scan
+    local_only = not allows_external(corpus_classification(root, settings.corpus_marker_file))
+    if local_only and args.corpus:
+        args.private_out = args.private_out.expanduser().resolve()
+        if _inside_git_work_tree(args.private_out):
+            raise SystemExit(
+                f"refusing: --private-out {args.private_out} is inside a git work tree"
+            )
     providers = args.provider or ["ollama"]
     run_at = datetime.now()
     c_hash = corpus_hash(root)
@@ -446,6 +570,10 @@ async def main() -> int:
             print(f"[{provider}] skipped: guardrail — {exc}")
             continue
         hybrid = "hybrid" if config["hybrid_search"] else "vector"
+        if config["vector_search"] == "exact":
+            hybrid += "-exact"
+        elif config["hnsw_iterative_scan"] != "off":
+            hybrid += "-iterative"
         if config["reranker"] != "none":
             hybrid += "-rerank"
         label = args.label or f"{config['embedding_model']}-{hybrid}-{config['generator_model']}"
@@ -455,6 +583,7 @@ async def main() -> int:
             "label": label,
             "corpus": corpus or "(all, RAW_DOCS_PATH)",
             "corpus_root": str(root.relative_to(ROOT)) if root.is_relative_to(ROOT) else "local",
+            "corpus_classification": corpus_classification(root, settings.corpus_marker_file),
             "corpus_sha256": c_hash,
             "questions_file": questions_path.name,
             "questions_sha256": hashlib.sha256(questions_path.read_bytes()).hexdigest(),
@@ -467,20 +596,22 @@ async def main() -> int:
             "by_lang": summarize_by(outcomes, lambda o: o.question.lang),
             "refusal_reasons": refusal_reasons(outcomes),
         }
-        stem = f"{run_at:%Y-%m-%d}_{corpus or 'raw'}_{label}_{c_hash[:8]}"
-        out = args.out / stem
-        out.mkdir(parents=True, exist_ok=True)
+        stem = f"{run_at:%Y-%m-%d}_{args.run_name or corpus or 'raw'}_{label}_{c_hash[:8]}"
+        full = (args.private_out if local_only and args.corpus else args.out) / stem
         report = render_report(config, summary, outcomes)
-        (out / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
-        (out / "summary.json").write_text(
-            json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        with (out / "questions.jsonl").open("w", encoding="utf-8") as fh:
-            for o in outcomes:
-                fh.write(json.dumps(question_record(o), ensure_ascii=False) + "\n")
-        (out / "report.md").write_text(report, encoding="utf-8")
+        write_results(full, config, summary, outcomes, report)
+        if full.parent != args.out:
+            # local-only corpus: the repo copy is aggregate only
+            write_results(
+                args.out / stem,
+                config,
+                summary,
+                None,
+                render_report(config, summary, outcomes, per_question=False),
+            )
+            print(f"[{provider}] aggregate written to {args.out / stem}")
         print(report)
-        print(f"[{provider}] results written to {out}")
+        print(f"[{provider}] results written to {full}")
     return 0
 
 

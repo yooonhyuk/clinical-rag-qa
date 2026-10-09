@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 import respx
+import yaml
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -152,3 +153,114 @@ async def test_both_providers_produce_the_same_response_model() -> None:
     assert [s.file_name for s in local.sources] == [s.file_name for s in external.sources]
     assert (local.usage.provider, external.usage.provider) == ("ollama", "anthropic")
     assert local.usage.input_tokens == 50 and external.usage.input_tokens == 120
+
+
+# --- local-only corpora (licensed-local-only) ---------------------------------------------
+
+
+@pytest.mark.parametrize("classification", ["licensed-local-only", "confidential", None])
+def test_local_only_classifications_never_allow_external(
+    settings: Settings, classification: str | None
+) -> None:
+    from app.services.llm_guardrail import LOCAL_ONLY_CLASSIFICATIONS, allows_external
+
+    assert not allows_external(classification)
+    if classification is not None:
+        assert classification in LOCAL_ONLY_CLASSIFICATIONS
+        _mark(settings.raw_docs_path, classification)
+        with pytest.raises(ExternalLLMNotAllowedError, match="not marked"):
+            validate_provider(_anthropic(settings))
+
+
+def test_private_corpus_template_is_local_only() -> None:
+    from app.services.llm_guardrail import allows_external
+
+    root = Path(__file__).resolve().parents[2]
+    marker = yaml.safe_load((root / "corpus" / "private.corpus.yaml.example").read_text())
+    assert marker["classification"] == "licensed-local-only"
+    assert not allows_external(marker["classification"])
+    assert marker["include"] == ["protocols/*.pdf", "originals/*.pdf"]
+
+
+def _rag(generator, lookup=None, **kwargs) -> tuple[RagService, list[dict]]:
+    calls: list[dict] = []
+
+    async def search(session, vector, *, top_k, **options):
+        calls.append(options)
+        return [make_chunk("a.md", 0.9)]
+
+    rag = RagService(
+        EmbeddingService(FakeOllama(), dimension=DIM),
+        generator,
+        system_prompt="sys",
+        min_score=0.5,
+        search=search,
+        corpus_lookup=lookup,
+        **kwargs,
+    )
+    return rag, calls
+
+
+async def test_external_generator_only_searches_allowed_classifications() -> None:
+    from app.services.llm_guardrail import ALLOWED_CLASSIFICATIONS
+
+    claude, _ = make_client(fake_response('{"answer": "ok [1]", "cited_context_ids": [1]}'))
+    rag, calls = _rag(claude)
+    await rag.retrieve(FakeSession(), "q", top_k=5)
+    assert calls[-1]["classifications"] == ALLOWED_CLASSIFICATIONS
+
+    local, local_calls = _rag(FakeOllama())
+    await local.retrieve(FakeSession(), "q", top_k=5)
+    assert "classifications" not in local_calls[-1]  # local generation: every corpus
+
+
+async def test_external_generator_rejects_a_local_only_corpus() -> None:
+    async def lookup(session, corpus):
+        return {"licensed-local-only"} if corpus == "private" else {"public-regulatory"}
+
+    claude, _ = make_client(fake_response('{"answer": "ok [1]", "cited_context_ids": [1]}'))
+    rag, calls = _rag(claude, lookup)
+    with pytest.raises(ExternalLLMNotAllowedError, match="local-only"):
+        await rag.ask(FakeSession(), "q", top_k=5, corpus="private")
+    with pytest.raises(ExternalLLMNotAllowedError):
+        await rag.retrieve(FakeSession(), "q", top_k=5, corpus="private")
+    assert calls == []  # rejected before retrieval: nothing was read
+    await rag.retrieve(FakeSession(), "q", top_k=5, corpus="public")
+    assert len(calls) == 1
+
+
+async def test_ollama_generator_may_use_a_local_only_corpus() -> None:
+    async def lookup(session, corpus):  # pragma: no cover - must not be consulted
+        raise AssertionError("local generation does not check classifications")
+
+    rag, calls = _rag(FakeOllama(), lookup)
+    await rag.retrieve(FakeSession(), "q", top_k=5, corpus="private")
+    assert calls[-1]["corpus"] == "private"
+
+
+async def test_search_mode_options_reach_the_search() -> None:
+    rag, calls = _rag(FakeOllama(), exact_search=True)
+    await rag.retrieve(FakeSession(), "q", top_k=5)
+    assert calls[-1]["exact"] is True and "iterative_scan" not in calls[-1]
+    rag, calls = _rag(FakeOllama(), hnsw_iterative_scan="relaxed_order")
+    await rag.retrieve(FakeSession(), "q", top_k=5)
+    assert calls[-1]["iterative_scan"] == "relaxed_order"
+
+
+def test_local_only_rejection_is_http_403(settings: Settings) -> None:
+    async def lookup(session, corpus):
+        return {"licensed-local-only"}
+
+    claude, _ = make_client(fake_response('{"answer": "ok [1]", "cited_context_ids": [1]}'))
+    _mark(settings.raw_docs_path, "public-regulatory")
+    container = build_container(
+        _anthropic(settings),
+        ollama=FakeOllama(),  # type: ignore[arg-type]
+        generator=claude,
+        session_factory=FakeSessionFactory(),  # type: ignore[arg-type]
+    )
+    container.rag._corpus_lookup = lookup
+    with TestClient(create_app(container)) as client:
+        res = client.post("/api/ask", json={"question": "스캔 주기는?", "corpus": "private"})
+    assert res.status_code == 403
+    assert res.json()["errorType"] == "EXTERNAL_LLM_NOT_ALLOWED"

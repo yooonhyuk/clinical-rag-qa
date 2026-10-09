@@ -6,14 +6,18 @@ Steps (blocking, run via `asyncio.to_thread`):
 2. drop running headers/footers: lines in the first/last 3 lines of a page that repeat (digits
    ignored) on at least 40% of pages, plus bare page numbers ("13", "- 7 -", "Page 3/43")
 3. drop table-of-contents lines (dot leaders)
-4. split into sections at detected headings (`headings.detect_heading`); a section keeps the
-   pages it spans as (char offset -> page number) so every chunk can cite its page
+4. find heading candidates (`headings.detect_heading`: numbered, appendix, table captions) and
+   keep only numbered headings that form a consistent chain (`headings.consistent_headings`:
+   section numbers quoted in an amendment table or a cross-reference are body text)
+5. split into sections at the kept headings; a section keeps the pages it spans as
+   (char offset -> page number) so every chunk can cite its page
 """
 
 import logging
 import re
 import unicodedata
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -23,6 +27,7 @@ from app.services.document_types import ExtractionError, Section
 from app.services.headings import (
     Heading,
     SectionPath,
+    consistent_headings,
     detect_heading,
     heading_continuation,
     is_toc_line,
@@ -57,7 +62,9 @@ _PAGE_NUMBER_RE = re.compile(
     re.IGNORECASE,
 )
 _DIGITS_RE = re.compile(r"\d+")
-_CHAR_FIXES = str.maketrans({"ᆞ": "·", "ㆍ": "·", " ": " "})
+# NUL bytes occur in some sponsor PDFs' text layer (an SAP of the private corpus); PostgreSQL
+# text columns reject them ("invalid byte sequence for encoding UTF8: 0x00").
+_CHAR_FIXES = str.maketrans({"ᆞ": "·", "ㆍ": "·", " ": " ", "\x00": None})
 
 
 def normalize_text(text: str) -> str:
@@ -133,6 +140,33 @@ def sections_from_pages(pages: list[str]) -> list[Section]:
     ]
     flat = [(page_no, ln) for page_no, lines in enumerate(page_lines, start=1) for ln in lines]
 
+    # Pass 1: heading candidates (a wrapped heading consumes its continuation line).
+    candidates: list[tuple[int, int, Heading]] = []  # (first line, lines consumed, heading)
+    i = 0
+    while i < len(flat):
+        line = flat[i][1]
+        if is_toc_line(line):
+            i += 1
+            continue
+        next_line = flat[i + 1][1] if i + 1 < len(flat) else None
+        heading = detect_heading(line, next_line)
+        if heading is None:
+            i += 1
+            continue
+        consumed = 1
+        if next_line is not None and (extra := heading_continuation(heading, next_line)):
+            heading = replace(heading, text=f"{heading.text} {extra}")
+            consumed = 2
+        candidates.append((i, consumed, heading))
+        i += consumed
+    # Pass 2: section numbers quoted in tables / cross-references are not headings.
+    keep = consistent_headings([h for _, _, h in candidates])
+    headings_at = {
+        start: (consumed, h)
+        for (start, consumed, h), kept in zip(candidates, keep, strict=True)
+        if kept
+    }
+
     path = SectionPath()
     sections: list[Section] = []
     buffer: list[str] = []
@@ -161,17 +195,14 @@ def sections_from_pages(pages: list[str]) -> list[Section]:
     i = 0
     while i < len(flat):
         page_no, line = flat[i]
-        i += 1
-        if is_toc_line(line):
-            continue
-        next_line = flat[i][1] if i < len(flat) else None
-        heading = detect_heading(line, next_line)
-        if heading is not None:
-            if next_line is not None and (extra := heading_continuation(heading, next_line)):
-                heading = Heading(heading.level, f"{heading.text} {extra}")
-                i += 1
+        if i in headings_at:
+            consumed, heading = headings_at[i]
+            i += consumed
             flush()
             path.push(heading)
+            continue
+        i += 1
+        if is_toc_line(line):
             continue
         if not spans or spans[-1][1] != page_no:
             spans.append((size, page_no))

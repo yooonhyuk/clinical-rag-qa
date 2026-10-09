@@ -6,7 +6,7 @@ import pytest
 
 from app.services.chunker import chunk_sections
 from app.services.document_loader import scan_documents
-from app.services.headings import SectionPath, detect_heading
+from app.services.headings import SectionPath, consistent_headings, detect_heading
 from app.services.pdf_extractor import normalize_text, sections_from_pages, strip_running_lines
 from app.services.table_rows import rows_to_lines
 from app.services.text_extractor import extract
@@ -222,3 +222,82 @@ def test_jats_paragraph_with_nested_list_keeps_its_lead_in(tmp_path: Path) -> No
     path.write_text(xml, encoding="utf-8")
     lines = extract(path, "xml")[0].text.splitlines()
     assert lines == ["Two groups were defined:", "RECIL-1: response", "and tested."]
+
+
+# --- long protocols: numbered-heading chain, table captions -----------------------------------
+
+
+def _protocol_pages() -> list[str]:
+    body = [
+        "1 PROTOCOL SUMMARY",
+        "1.1 Synopsis",
+        "Synopsis text.",
+        "Table 1 Objectives and Endpoints",
+        "Objectives Endpoints",
+        "2 INTRODUCTION",
+        "2.1 Study Rationale",
+        "Rationale text.",
+        "3 STUDY DESIGN",
+        "3.1 Overall Design",
+        "Design text.",
+        "4 STUDY ASSESSMENTS",
+        "4.1 Efficacy Assessments",
+        "4.1.1 RECIST 1.1 Assessments",
+        "Scans every 6 weeks.",
+        "4.1.2 Central Reading of Scans",
+        "Central reading text.",
+    ]
+    # amendment history table before section 1: section numbers quoted in cells
+    amendment = [
+        "Section # and Name Description of Change",
+        "5.2 Exclusion Criteria",
+        "Reworded item 8",
+        "Appendix G Imaging Guideline",
+        "8.3.14.1 Some Later Subsection",
+        "Clarified wording",
+    ]
+    return ["\n".join(amendment), "\n".join(body)]
+
+
+def test_section_numbers_quoted_in_an_amendment_table_are_not_headings() -> None:
+    sections = sections_from_pages(_protocol_pages())
+    titles = [s.section_title for s in sections]
+    assert titles[0] is None  # the amendment table stays body text of the front matter
+    assert "Appendix G" not in " ".join(t or "" for t in titles)
+    assert "8.3.14.1" not in " ".join(t or "" for t in titles)
+    assert "4 STUDY ASSESSMENTS > 4.1 Efficacy Assessments > 4.1.2 Central Reading of Scans" in (
+        titles
+    )
+    assert "1 PROTOCOL SUMMARY > 1.1 Synopsis > Table 1 Objectives and Endpoints" in titles
+
+
+def test_table_captions_are_headings_but_references_are_not() -> None:
+    caption = detect_heading(
+        "Table 4 Schedule of Assessments During the Treatment Period", "Procedures"
+    )
+    assert caption is not None and caption.kind == "table" and caption.level == 9
+    assert detect_heading("Table 5 for the visit windows", None) is None
+    numbered = detect_heading("8.1.2 Central Reading of Scans", "Body.")
+    assert numbered is not None and numbered.number == (8, 1, 2)
+
+
+def test_consistent_headings_keeps_the_longest_numbered_chain() -> None:
+    lines = ["1 A", "1.1 B", "9.9.9 Quoted", "1.2 C", "2 D", "2.1 E", "4.2 Ref", "2.2 F", "3 G"]
+    headings = [detect_heading(line, "Body.") for line in lines]
+    assert all(headings)
+    keep = consistent_headings(headings)  # type: ignore[arg-type]
+    assert [line for line, k in zip(lines, keep, strict=True) if not k] == [
+        "9.9.9 Quoted",
+        "4.2 Ref",
+    ]
+
+
+def test_korean_documents_keep_every_heading() -> None:
+    lines = ["4. 의뢰자", "가. 품질보증", "1. 중요한 과정", "2. 위험요소 확인", "5. 기본문서"]
+    lines += [f"{n}.1 항목 {n}" for n in range(1, 6)]
+    headings = [detect_heading(line, "본문.") for line in lines]
+    assert all(consistent_headings([h for h in headings if h]))
+
+
+def test_nul_bytes_are_removed_from_pdf_text() -> None:
+    assert normalize_text("a\x00b") == "ab"
