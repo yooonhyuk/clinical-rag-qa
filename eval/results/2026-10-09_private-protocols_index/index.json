@@ -1,0 +1,53 @@
+{
+  "run_at": "2026-10-09",
+  "corpus": "private (local only, classification licensed-local-only)",
+  "embedding_model": "bge-m3",
+  "chunk_size": 1000,
+  "chunk_overlap": 150,
+  "documents": 31,
+  "chunks": 8447,
+  "indexing_seconds": {
+    "first_run_30_docs": 708.6,
+    "rerun_after_nul_fix_1_doc": 37.4
+  },
+  "first_run_failure": "NCT04494425_SAP_003.pdf: DB_ERROR, NUL byte (0x00) in extracted text; fixed in pdf_extractor.normalize_text",
+  "chunks_per_document": {
+    "NCT01712490_Prot_000.pdf": 272,
+    "NCT01712490_SAP_001.pdf": 93,
+    "NCT02667587_Prot_000.pdf": 267,
+    "NCT02667587_SAP_001.pdf": 134,
+    "NCT02987543_Prot_005.pdf": 495,
+    "NCT02987543_SAP_015.pdf": 285,
+    "NCT03345095_Prot_000.pdf": 386,
+    "NCT03345095_SAP_001.pdf": 130,
+    "NCT03375320_Prot_SAP_000.pdf": 396,
+    "NCT03517137_Prot_SAP_000.pdf": 362,
+    "NCT03568461_Prot_002.pdf": 552,
+    "NCT03568461_SAP_001.pdf": 89,
+    "NCT03739684_Prot_000.pdf": 155,
+    "NCT03739684_SAP_001.pdf": 120,
+    "NCT03785964_Prot_000.pdf": 325,
+    "NCT03785964_SAP_001.pdf": 180,
+    "NCT03785964_SAP_002.pdf": 82,
+    "NCT03820986_Prot_SAP_001.pdf": 463,
+    "NCT04236141_Prot_000.pdf": 407,
+    "NCT04236141_SAP_001.pdf": 103,
+    "NCT04427072_Prot_000.pdf": 589,
+    "NCT04427072_SAP_001.pdf": 92,
+    "NCT04494425_Prot_002.pdf": 627,
+    "NCT04494425_SAP_003.pdf": 267,
+    "NCT04698187_Prot_000.pdf": 373,
+    "NCT04698187_SAP_001.pdf": 130,
+    "protocol_NCT03761056.pdf": 234,
+    "protocol_NCT04489771.pdf": 316,
+    "qiba_ct_tumor_volume_change_2022.pdf": 115,
+    "qiba_fdg_pet_ct_v1.14_2023.pdf": 284,
+    "recist_1.1_eisenhauer_2009.pdf": 124
+  },
+  "db_after_indexing": {
+    "toy": 32,
+    "public": 2029,
+    "private": 8447
+  },
+  "host": "Apple M5 32GB, host Ollama 0.24.0, pgvector/pgvector:0.8.0-pg16 throwaway DB"
+}

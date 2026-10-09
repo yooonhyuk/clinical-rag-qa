@@ -191,14 +191,44 @@ make scope-eval                                 # B6: OUT_OF_SCOPE 분류기 hel
 uv sync --project backend --all-groups --extra rerank
 make eval CORPUS=public EVAL_ARGS="--hybrid off --reranker bge-reranker-v2-m3 --rerank-min-score 0"
 make eval CORPUS=public EVAL_ARGS="--hybrid off --generator-model medgemma:4b"   # 생성 모델 비교
-make eval CORPUS=~/clinical-rag-private/originals EVAL_ARGS="--reindex --questions my.yaml"  # 로컬 전용
+make eval-private                                # 로컬 전용 프로토콜 79문항 (집계만 eval/results)
+make eval-private EVAL_ARGS="--vector-search exact"
 ```
 
 - `CORPUS`는 `toy`(`samples/documents`), `public`(`corpus/public`) 또는 폴더 경로입니다. 문서는 코퍼스 이름(`.corpus.yaml`의 `name`)으로 태그되고, 평가는 그 코퍼스 안에서만 검색합니다. 한 DB에 여러 코퍼스를 넣어도 서로 섞이지 않습니다. `CORPUS`를 주지 않으면 MVP-1처럼 `RAW_DOCS_PATH`를 쓰고 코퍼스 필터를 걸지 않습니다.
 - 결과는 `eval/results/<날짜>_<코퍼스>_<설정>_<코퍼스 해시 8자리>/`에 `config.json`(모델·검색 설정·코퍼스/문항 SHA-256·git commit), `summary.json`(전체·유형별·언어별·거절 사유), `questions.jsonl`(문항별 검색·인용 chunk, 답변, 지연), `report.md`로 저장하고 git에 커밋합니다. 로컬 전용 코퍼스의 결과는 커밋하지 않습니다.
 - `--generator-model`(예: `medgemma:4b`)로 생성 모델을, `--scope-classifier`로 OUT_OF_SCOPE 판별 방식을 바꿀 수 있습니다. `--reranker bge-reranker-v2-m3`는 cross-encoder 단계를 켭니다(`--rerank-candidates`, `--rerank-min-score`). `--partial-answers off`는 MVP-1 거절 정책으로 실행합니다. 결과에는 부분 답변 비율과 같은 실행을 MVP-1 정책으로 채점한 값(`legacy_*`), JSON schema 준수율, 한국어 답변 비율이 함께 남습니다.
 - rerank 게이트 임계값은 게이트를 끈 실행(`--rerank-min-score 0`)에서 `eval/tune_gate.py`로 dev 분할(toy 전체 + public 유형별 짝수 번째)에서만 고릅니다. held-out(public 홀수 번째)은 보고용입니다.
+- `--vector-search exact`는 HNSW 인덱스를 끄고 정확한 cosine 순서로 검색합니다(재현용, [이슈 009](docs/issues/009-retrieval-differs-across-reindex.md)). `config.json`의 `db_state`에 코퍼스별 chunk 수와 HNSW 파라미터가 남습니다. 로컬 전용 코퍼스(분류가 외부 허용이 아닌 폴더)는 전체 결과를 `--private-out`(기본 `~/clinical-rag-private/eval/results`)에, 집계만 `eval/results/`에 씁니다.
 - `make eval`은 호스트에서 실행되고 `EVAL_DATABASE_URL`(기본 `localhost:5432`)과 `EVAL_OLLAMA_URL`에 붙습니다. 아래 수치는 기존 볼륨을 건드리지 않도록 일회용 컨테이너 DB(`pgvector/pgvector:0.8.0-pg16`, `127.0.0.1:55432`, 익명 볼륨)로 만들었습니다.
+
+### 5) 직접 써 보기 (Try it yourself): toy / public / private 코퍼스를 UI에서 질문
+
+UI의 **질문하기** 탭에서 코퍼스(전체 / toy / public / private)를 고르면 검색이 그 코퍼스로 제한됩니다(`GET /api/corpora`, `POST /api/ask {"corpus": ...}`). **인덱싱** 탭의 "코퍼스 폴더"에서 toy·public·private 폴더를 골라 인덱싱합니다.
+
+```bash
+# A. Docker (호스트 Ollama, 모델을 받지 않음)
+make up-host-ollama                # toy·public만
+make up-private                    # + ~/clinical-rag-private를 api 컨테이너에 읽기 전용 마운트 (PRIVATE_DIR=...)
+open http://localhost:8501         # 인덱싱 탭 → 코퍼스 폴더 선택 → 인덱싱 실행 → 질문하기 탭에서 코퍼스 선택
+
+# B. 로컬 실행 (DB만 컨테이너, 일회용)
+docker run -d --name crqa-try -e POSTGRES_USER=clinical -e POSTGRES_PASSWORD=clinical \
+  -e POSTGRES_DB=clinical_rag_qa -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data \
+  pgvector/pgvector:0.8.0-pg16
+export DATABASE_URL=postgresql+asyncpg://clinical:clinical@127.0.0.1:55432/clinical_rag_qa
+export EVAL_DATABASE_URL=$DATABASE_URL OLLAMA_BASE_URL=http://localhost:11434 \
+  PRIVATE_CORPUS_PATH=$HOME/clinical-rag-private
+(cd backend && uv run alembic upgrade head)
+make index-folder DIR=samples/documents && make index-folder DIR=corpus/public
+make index-folder DIR=~/clinical-rag-private        # 로컬 전용, 31개 PDF 약 12분
+make api   # 다른 터미널: make ui → http://localhost:8501
+```
+
+- **private 코퍼스는 이 컴퓨터를 떠나지 않습니다.** 폴더는 저장소 밖(`~/clinical-rag-private`)에 두고 `scripts/fetch-protocols.sh`·`fetch-originals.sh`로만 채웁니다(git work tree 안에는 쓰기를 거부). `.corpus.yaml`은 `corpus/private.corpus.yaml.example`을 복사합니다(`classification: licensed-local-only`, `include: [protocols/*.pdf, originals/*.pdf]`).
+- **외부 LLM은 private 코퍼스에 쓰이지 않습니다.** 문서마다 인덱싱 시점의 분류가 `documents.classification`에 저장되고, `LLM_PROVIDER=anthropic`이면 검색이 허용된 분류(`synthetic-sample`, `non-sensitive`, `public-regulatory`)의 문서만 읽으며, private으로 제한한 질문은 검색 전에 403(`EXTERNAL_LLM_NOT_ALLOWED`)으로 거부합니다. 분류가 없는 문서도 로컬 전용으로 취급합니다.
+- private 평가셋(79문항, 근거 원문 포함)은 `~/clinical-rag-private/eval/protocol_questions.yaml`에 두고, 저장소에는 형식만 담은 `eval/protocol_questions.template.yaml`이 있습니다. `make eval-private`는 전체 결과를 private 폴더에, 집계(`config.json`·`summary.json`·문항 id만 있는 `report.md`)만 `eval/results/`에 씁니다. 근거 위치 테스트는 그 파일이 있을 때만 돕니다(`PROTOCOL_QUESTIONS`, CI에서는 skip).
+- 답변은 근거가 된 프로토콜 chunk를 출처로 보여 주지만, 아래 [실제 프로토콜 평가](#실제-프로토콜-로컬-전용-2026-10-09)처럼 **다른 시험의 문서로 답할 수 있습니다.** 출처 파일명의 NCT 번호를 반드시 확인하세요.
 
 ---
 
@@ -342,6 +372,30 @@ public 99문항(답 79 / 거절 20)을 **한 색인**에서 실행했습니다. 
 - 같은 코퍼스를 새 DB에 다시 색인하자 첫 기준선(아래 표)과 3문항의 top-5가 달라졌습니다(p68 등, hit@5 94.9% → 96.2%). 오늘 만든 두 색인은 서로 같았고 원인은 확정하지 못했습니다([이슈 009](docs/issues/009-retrieval-differs-across-reindex.md)). 위 표의 실행은 모두 같은 색인을 썼습니다.
 - reranker 단독 지연(Apple M5, 질문 1개 × 후보 30개, Ollama 유휴): MPS 512토큰 텍스트 약 3.0초, 짧은 텍스트(약 160토큰) 1.1초 / CPU 짧은 텍스트 2.3초. 모델 로드 3~15초, MPS 할당 2.29GB. 개발 과정은 [docs/journey.md](docs/journey.md)에 정리했습니다.
 
+### 실제 프로토콜 (로컬 전용, 2026-10-09)
+
+ClinicalTrials.gov에 공개된 14개 시험의 프로토콜·SAP 26개 + RECIST 1.1·QIBA FDG-PET v1.14·QIBA CT 부피·프로토콜 2건 = **31개 PDF, 8,447 chunk**(인덱싱 약 12분 30초, bge-m3). 저작권 문서라 저장소에는 없고(`scripts/fetch-protocols.sh`로 각자 받음), 원문을 읽고 쓴 79문항(답 64 / 거절 대상 15, 한국어 62%)으로 평가했습니다. 결과는 집계만: `eval/results/2026-10-09_private-protocols_*`. 한 DB에 toy·public·private을 함께 넣었습니다(UI와 같은 상태).
+
+| 지표 | toy · 벡터 | public · 벡터 (2회) | **private · 벡터 HNSW** | private · 벡터 exact |
+|---|---|---|---|---|
+| hit@5 (파일) | 100% | 96.2% / 96.2% | **75.0%** (검색 단계만 79.7%) | 75.0% |
+| 섹션/페이지 hit@5 | 100% | 87.3% / 87.3% | **45.3%** | 45.3% |
+| Citation accuracy | 89.5% | 86.3% / 87.5% | **50.0%** | 50.0% |
+| Keyword coverage | 100% | 91.8% / 93.1% | 63.1% | 63.1% |
+| Refusal accuracy | 100% | 95.0% / 95.0% | 93.3% (15) | 86.7% |
+| False refusal | 0% | 7.6% / 8.9% | **34.4%** (OUT_OF_SCOPE 7, 모델 15) | 34.4% |
+| 부분 답변 | – | 7.6% / 8.9% | 12.5% | 10.9% |
+| 다른 시험 chunk 비율 (top-5) | – | – | 48.8% | 48.8% |
+| 전체 p50 / p95 | 4.2 / 6.7 s | 6.7 / 11.2 s | 21.6 / 42.7 s | 19.9 / 38.7 s |
+
+유형별(HNSW): 영상 일정 hit 54.5%·오거절 54.5%, BICR 절차 80% / 30%, 반응 기준 적용 76.9% / 23.1%, 영상 관련 선정 기준 72.7% / 45.5%, SAP 평가변수 88.9% / 11.1%(섹션 hit 77.8%, Citation 25%), 시험 간 비교 80% / 40%, 프로토콜↔SAP 80% / 40%. 진단·치료 요청 5/5, 범위 밖 3/3 거절, 같은 주제 무응답 7개 중 1개는 부분 답변으로 나갔습니다.
+
+- **다른 시험의 chunk가 섞임**([이슈 012](docs/issues/012-chunks-without-trial-identity.md), #13): 스폰서 문서는 시험 약칭을 거의 쓰지 않고, chunk 머리말은 "1.1 Synopsis" 같은 섹션 경로뿐입니다. top-5의 48.8%가 다른 시험 문서였고, 모델은 다른 시험의 근거로 질문한 시험의 답처럼 답했습니다(출처의 NCT 번호가 다름).
+- **영상 일정 질문을 진단 요청으로 거절**([이슈 011](docs/issues/011-scope-classifier-refuses-protocol-imaging-questions.md), #12): B6 분류기가 답 있는 질문 7개(10.9%)를 생성 전에 막았습니다. 이 평가셋으로 margin을 고치지 않습니다.
+- **PDF 기호 손실과 회전 일정표**([이슈 013](docs/issues/013-pdf-glyph-loss-and-rotated-tables.md), #14): `≥`→`P`, "6–8"→"68". 가로 회전된 Schedule of Assessments는 행 구조를 복원하지 못했습니다(표 캡션을 헤딩으로 잡는 데까지). 개정 이력 표의 섹션 번호가 헤딩을 오염시키던 문제는 번호 사슬 검사로 고쳤습니다.
+- **#10 재현성**: 혼합 DB에서는 플래너가 코퍼스 필터 때문에 exact 계획을 골라 HNSW·exact top-5가 79문항 모두 같았습니다. public만 든 DB에서는 HNSW가 쓰여 4문항이 달랐고(hit@5 94.9%, 첫 기준선과 같은 값) `ef_search=200`이면 0문항입니다([이슈 009](docs/issues/009-retrieval-differs-across-reindex.md)).
+- **지연**은 호스트 메모리 압박(스왑 약 10GB) 아래서 잰 값이라 public 수치와 직접 비교하지 않습니다. 기본 설정 2회차와 reranker를 켠 생성 평가는 호스트가 배터리 절전 수면에 들어가 진행이 멈춰 중단했습니다(완료하지 못한 실행의 수치는 싣지 않음). reranker는 검색 단계만 비교했습니다: exact top-30 → bge-reranker-v2-m3 → top-5로 파일 hit@5 79.7% → **85.9%**, 섹션/페이지 hit 45.3% → **71.9%**(검색 p50 약 3.8초, `eval/results/2026-10-09_search-modes_issue-009/private.json`). public에서보다 이득이 훨씬 커서, 답변 품질로 이어지는지는 생성 평가로 다시 확인해야 합니다.
+
 ### toy vs public 요약 (첫 기준선, 부분 답변 정책 이전)
 
 | 지표 | toy · 벡터 | toy · 하이브리드 | **public · 벡터 (기본값)** | public · 하이브리드 |
@@ -474,10 +528,10 @@ HYBRID_SEARCH=true  make eval
 - **chunking**은 섹션 단위(헤딩 번호·JATS `sec`·HTML `h1~h6`)에 문자 수 기준 분할입니다. JATS·HTML 표는 행 단위(`헤더: 값`)로 처리하지만 PDF 표는 구조 없이 텍스트로 들어갑니다. PDF 헤딩은 번호 패턴으로만 찾으므로 번호 없는 소제목(FDA Appendix A의 글머리 소제목 등)은 섹션으로 나뉘지 않고 페이지 번호로만 위치를 표시합니다([ADR 0001](docs/decisions/0001-pdf-library.md)).
 - **공개 평가셋의 한계**: 99문항은 한 사람이 문서를 읽고 쓴 것이고, 질문 표현이 원문 문장과 가까워 실제 사용자 질문보다 쉬울 수 있습니다. 근거 문장 위치는 테스트로 검증하지만 정답 문구(`answer_key`)의 채점은 키워드(`must_include`)와 인용 위치로만 합니다(LLM 채점 없음). 하이브리드는 한 번, 벡터 단독은 두 번 실행했습니다.
 - **reranker·생성 모델 비교는 Apple M5(MPS) 호스트에서만** 측정했습니다. CPU 전용 linux/amd64 장비의 지연, reranker를 넣은 api 이미지와 오프라인 번들, 새 held-out으로 검증한 rerank 게이트는 아직 없습니다. 기본 생성 모델 gemma4:e4b는 실행 크기가 약 10.7GB라 오프라인 장비(또는 Docker VM)에 12GB 이상 메모리가 필요합니다.
-- **다음 단계로 미룬 비교**: 로컬 전용 원문 코퍼스(`make fetch-originals`) 평가는 아직 실행하지 않았습니다. 공개 코퍼스의 남은 실패는 [이슈 005~010](#공개-코퍼스에서-드러난-실패)에 정리했습니다.
+- **실제 프로토콜**: 로컬 전용 79문항은 한 사람이 쓴 것이고 생성 평가는 HNSW·exact 각 1회입니다. 시험 식별자(#13), 분류기 오거절(#12), PDF 기호 손실(#14)은 열려 있습니다. 공개 코퍼스의 남은 실패는 [이슈 005~010](#공개-코퍼스에서-드러난-실패)에 정리했습니다.
 - `/api/index`는 동기 실행입니다(요청이 인덱싱 완료까지 대기). 목표인 100개 이하 문서에서는 문제없지만, 규모가 커지면 작업 큐(arq 등)가 필요합니다.
 - embedding 차원을 바꾸면 기존 벡터를 모두 지우고 재인덱싱해야 합니다(`make reset-embeddings` → `make index`). 그 사이에는 검색 결과가 비고, `/api/health`가 `embeddingIndex` 불일치로 `degraded`를 보고합니다. 설정한 차원과 모델이 실제로 내는 차원이 다르면 인덱싱은 `EMBEDDING_DIM_MISMATCH`로 실패합니다.
-- anthropic 모드의 가드레일은 "표식이 붙은 폴더만 인덱싱한다"까지 보장합니다. 이전에 ollama 모드로 인덱싱해 DB에 이미 들어 있는 문서까지 검사하지는 않으므로, Provider를 바꿀 때는 DB를 새로 만드는 것을 권장합니다.
+- anthropic 모드의 가드레일은 인덱싱(표식 검사)과 검색(문서별 `classification` 필터) 두 곳에서 동작합니다. Alembic 0006 이전에 인덱싱된 문서는 분류가 없어 외부 모드에서 검색되지 않으므로, 다시 인덱싱해야 합니다.
 - **DICOM 규칙**: 파일 단위 검사입니다(series/study 일관성은 다음 단계). Type 1C/2C와 조건부 모듈은 평가하지 않고, 더미 치환·UID 치환·정제 여부는 파일 하나로 확인할 수 없어 참고로만 보고합니다. 픽셀은 읽지 않으므로 픽셀 내 식별정보는 위험 표시만 합니다. 합성 샘플로만 테스트했고 실제 공개 DICOM은 아직 돌리지 않았습니다. 자세한 내용은 [docs/dicom-rules.md](docs/dicom-rules.md#6-한계).
 - 스캔 PDF(OCR), DOCX·Excel, 문서 기반 업로드 기준 비교(DICOM Layer 3), QC 시나리오 생성은 MVP-2 범위입니다.
 
@@ -489,7 +543,7 @@ HYBRID_SEARCH=true  make eval
 |---|---|---|---|
 | toy | `samples/documents/` | `synthetic-sample` | 직접 만든 가상 문서 6종 (평가셋 `eval/questions.yaml`) |
 | public | `corpus/public/` | `public-regulatory` | 공개 규제 가이드라인·CC BY 논문·DICOM 표준 발췌 11종 (평가셋 `eval/public_questions.yaml`) |
-| private | 저장소 밖 (`~/clinical-rag-private/originals`) | — | 재배포할 수 없는 원문(RECIST 1.1, Lugano, iRECIST, RANO 2.0, LYRIC, QIBA, 프로토콜 2건). `make fetch-originals`로 로컬에만 받음 |
+| private | 저장소 밖 (`~/clinical-rag-private`: `protocols/`, `originals/`) | `licensed-local-only` | 재배포할 수 없는 문서: ClinicalTrials.gov 프로토콜·SAP 26개(`make fetch-protocols`), RECIST 1.1·QIBA·프로토콜 2건(`make fetch-originals`). 로컬에만 받고 외부 LLM에 보내지 않음 |
 
 `corpus/public/`의 파일은 원본을 **수정하지 않고** 그대로 넣었습니다. 인덱싱 결과(섹션 수 / chunk 수, chunk 1000자·overlap 150)는 다음과 같습니다.
 

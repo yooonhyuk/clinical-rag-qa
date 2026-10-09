@@ -1,6 +1,6 @@
 # 009. 같은 코퍼스·같은 설정인데 첫 public 기준선의 top-5가 재현되지 않음 (p68, p95, p98)
 
-- 상태: 열림 (원인 미확정, 재현 조건 기록)
+- 상태: 원인 확인 (2026-10-09). 설정 추가: `VECTOR_SEARCH=exact`, `HNSW_EF_SEARCH`, `HNSW_ITERATIVE_SCAN`. 기본값은 hnsw 유지
 - GitHub: https://github.com/yooonhyuk/clinical-rag-qa/issues/10
 - 발견: 2026-10-07, B7 평가를 위해 새 일회용 DB에 public 코퍼스를 다시 색인한 뒤
 - 영향 범위: 평가 수치의 재현성(특히 이슈 006의 p68 사례), 운영 DB에서 다른 코퍼스가 섞일 때의 검색
@@ -36,3 +36,24 @@
 - 검색 세션에서 `SET hnsw.iterative_scan = relaxed_order`(pgvector 0.8)를 켜거나 `hnsw.ef_search`를 높여, 필터가 있어도 top-k를 채우게 한다. 지연을 측정해 결정한다.
 - 평가 `config.json`에 DB의 코퍼스별 chunk 수, HNSW 파라미터(`m`, `ef_construction`, `ef_search`, `iterative_scan`)를 기록한다.
 - 결과 비교는 같은 색인을 쓴 실행끼리만 한다(이번 B7 평가는 모두 같은 색인을 썼습니다).
+
+## 원인 확인 (2026-10-09)
+
+`eval/compare_search_modes.py`로 같은 DB 안에서 기본 계획 / exact / iterative scan / `ef_search` 100·200의 top-5를 비교했습니다(결과 `eval/results/2026-10-09_search-modes_issue-009/`).
+
+| DB | 질문 | 플래너 계획 (EXPLAIN) | 기본 vs exact 차이 | hit@5 (기본 / exact) |
+|---|---|---|---|---|
+| toy+public+private 혼합 (10,508 chunk) | public 99 | seq scan + sort (= exact) | 0 | 96.2% / 96.2% |
+| 같은 혼합 DB | private 79 | seq scan + sort | 0 | 79.7% / 79.7% |
+| 같은 데이터에서 **public만 남김** (2,029 chunk) | public 99 | `Index Scan using chunks_embedding_hnsw` | **4문항** (p44, p83, p95, p98) | **94.9%** / 96.2% |
+
+- HNSW 사용 여부는 플래너가 정합니다. 코퍼스 필터가 소수의 행만 남기면 seq scan(정확)을, DB가 거의 그 코퍼스뿐이면 HNSW 인덱스(근사)를 고릅니다. 첫 기준선과 B7 DB는 public(+toy)만 들어 있어 HNSW가 쓰였고, HNSW 그래프는 삽입 순서(PARSE_CONCURRENCY=2 동시 인덱싱)에 따라 달라지므로 색인마다 근사 top-5가 달랐습니다. public-only 복사본의 hit@5 94.9%는 첫 기준선 값과 같습니다. → **원인은 근사 검색**입니다.
+- public-only DB에서 `iterative_scan=relaxed_order`는 그대로 4문항(필터 문제가 아니므로), `ef_search=100`은 2문항, `ef_search=200`은 0문항이었습니다.
+- 사후 필터 가설도 실제로 일어납니다. 혼합 DB에서 `ef_search=200`을 주면 플래너가 HNSW로 바꾸고, public 7문항의 top-5가 exact와 달라졌으며 2문항은 5개를 채우지 못했습니다.
+- SQL 시간(Apple M5, 10.5k chunk): exact 16~33 ms, HNSW 6~39 ms. 이 규모(목표 100개 이하 문서)에서는 exact가 충분히 빠르고 DB 내용과 무관하게 재현됩니다.
+
+### 조치
+
+- `VECTOR_SEARCH=exact`(트랜잭션 안에서 `enable_indexscan=off`), `HNSW_EF_SEARCH`, `HNSW_ITERATIVE_SCAN` 설정과 `--vector-search` / `--hnsw-iterative-scan` 평가 옵션을 추가했습니다.
+- 평가 `config.json`에 `db_state`(코퍼스별 chunk 수, HNSW 인덱스 정의, `hnsw.ef_search`, `hnsw.iterative_scan`, pgvector 버전)를 기록합니다.
+- 기본값은 바꾸지 않았습니다(hnsw). 평가를 재현할 때는 `--vector-search exact`를 권장하고, 코퍼스가 수십만 chunk로 커지면 exact 대신 `ef_search`를 올리고 iterative scan을 켜는 쪽을 다시 측정합니다.
