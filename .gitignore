@@ -22,3 +22,6 @@ clinical-rag-private/
 corpus/private/
 corpus/originals/
 corpus/**/*.part
+# .ai workflow: run artifacts (logs, responses, may contain local-only text) stay out of git
+.ai/packets/**/evidence/
+.ai/wip-backup/
