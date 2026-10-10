@@ -1,0 +1,19 @@
+{
+  "answerable": 64,
+  "probe_file_hit_at_k": 0.7812,
+  "probe_section_hit_at_k": 0.3281,
+  "other_trial_chunk_share": 0.5219,
+  "answerable_refused_by_reason": {
+    "MODEL_REFUSED": 10,
+    "OUT_OF_SCOPE": 8
+  },
+  "probe_file_hit_by_type": {
+    "bicr_process": 0.7,
+    "cross_doc": 0.6,
+    "cross_trial": 1.0,
+    "eligibility_imaging": 0.7273,
+    "imaging_schedule": 0.5455,
+    "response_criteria": 1.0,
+    "sap_endpoint": 0.8889
+  }
+}

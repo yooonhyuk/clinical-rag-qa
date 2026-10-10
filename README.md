@@ -247,7 +247,8 @@ make api   # 다른 터미널: make ui → http://localhost:8501
 
 - 처음 쓰던 nomic-embed-text는 영어 WordPiece 어휘(30,522개)에 한글 음절 토큰이 하나도 없습니다. 그래서 한국어 단어가 모두 `[UNK]`가 되고, 서로 다른 한국어 질문의 cosine이 1.0이 나왔습니다. 원인 분석, 재현 방법, 전후 지표는 [docs/issues/001-korean-embedding-unk.md](docs/issues/001-korean-embedding-unk.md)에 정리했습니다.
 - 모델과 차원은 설정으로 바꿉니다(`OLLAMA_EMBEDDING_MODEL`, `EMBEDDING_DIM`, `EMBEDDING_QUERY_PREFIX`, `EMBEDDING_DOCUMENT_PREFIX`).
-  - 알려진 모델(`bge-m3` 1024, `nomic-embed-text` 768 + task prefix)은 차원과 prefix를 자동으로 채웁니다.
+  - 알려진 모델(`bge-m3` 1024, `nomic-embed-text` 768 + task prefix, `embeddinggemma-2:270m`/`:740m` 768 + task prefix)은 차원과 prefix를 자동으로 채웁니다.
+  - `EMBEDDING_TRUNCATE_DIM`(Matryoshka, 기본 없음)은 EmbeddingGemma 2에서만 512/256/128을 받고, Ollama `/api/embed`의 `dimensions`로 앞 N차원(L2 정규화)을 받습니다. 차원이 바뀌므로 `make reset-embeddings` 후 재인덱싱합니다. 그 외 조합은 앱이 시작되지 않습니다.
   - 그 외 모델은 `EMBEDDING_DIM`이 필수입니다. 모델과 맞지 않는 차원을 지정하면 앱이 시작되지 않습니다.
 - 모든 chunk·문서·인덱싱 작업에 `embedding_model`을 기록합니다(Alembic `0004`).
   - 검색은 설정된 모델의 chunk만 읽습니다.
@@ -371,6 +372,20 @@ public 99문항(답 79 / 거절 20)을 **한 색인**에서 실행했습니다. 
 - **생성 모델**: medgemma:4b는 메모리가 작고 빠르지만 거절 대상 문항에 값을 지어내고(p52 "ICC 0.86", p95 "BICR 최소 30명"), 영어 질문의 약 74%에 영어로 답했습니다. 진단 요청 9문항은 두 모델 모두 100% 거절했지만, 생성 전에 B6 분류기가 막은 결과입니다. **gemma4:e4b를 유지합니다**([ADR 0005](docs/decisions/0005-generator-model.md), [이슈 010](docs/issues/010-medgemma-fabricates-no-answer-values.md)). 라이선스: Gemma 4는 Apache 2.0, MedGemma는 Health AI Developer Foundations 약관(재배포 시 사용 제한 조항·약관 사본·NOTICE 필요).
 - 같은 코퍼스를 새 DB에 다시 색인하자 첫 기준선(아래 표)과 3문항의 top-5가 달라졌습니다(p68 등, hit@5 94.9% → 96.2%). 오늘 만든 두 색인은 서로 같았고 원인은 확정하지 못했습니다([이슈 009](docs/issues/009-retrieval-differs-across-reindex.md)). 위 표의 실행은 모두 같은 색인을 썼습니다.
 - reranker 단독 지연(Apple M5, 질문 1개 × 후보 30개, Ollama 유휴): MPS 512토큰 텍스트 약 3.0초, 짧은 텍스트(약 160토큰) 1.1초 / CPU 짧은 텍스트 2.3초. 모델 로드 3~15초, MPS 할당 2.29GB. 개발 과정은 [docs/journey.md](docs/journey.md)에 정리했습니다.
+
+### EmbeddingGemma 2 재평가 (Ollama 0.40.2, 2026-10-10)
+
+호스트 Ollama를 0.40.2로 올린 뒤 bge-m3 기준선을 다시 재고(검색 지표는 0.24.0과 같음), `embeddinggemma-2:270m`을 768 / 512 / 256차원으로 같은 조건에서 비교했습니다(일회용 DB, exact 검색, gemma4:e4b `think:false`, toy 25 / public 99 / private 79문항). 결과: `eval/results/2026-10-10_*`, 해석과 한계: [ADR 0002](docs/decisions/0002-embedding-model.md) "2026-10 재평가". 임계값은 모델마다 예시 또는 dev만으로 다시 정했고, cosine 게이트는 모든 모델에서 "게이트 없음"이 됐습니다.
+
+| 지표 | **bge-m3 1024d (기본, 같은 규칙)** | 270m 768d | 270m 512d | 270m 256d |
+|---|---|---|---|---|
+| hit@5 toy / public / private | **100 / 96.2 / 75.0** | 89.5 / 92.4 / 68.8 | 89.5 / 91.1 / 75.0 | 84.2 / 92.4 / 70.3 |
+| 섹션 hit toy / public / private | **100 / 87.3 / 45.3** | 89.5 / 81.0 / 34.4 | 89.5 / 81.0 / 34.4 | 84.2 / 79.7 / 31.2 |
+| 오거절 toy / public / private | 0 / 5.1 / 29.7 | 10.5 / 11.4 / 34.4 | 10.5 / 7.6~8.9 / 17.2 | 10.5 / 8.9 / 28.1 |
+| B6 정밀도 / 재현율 / 오거절 | **95.8 / 92.0 / 2.8** | 88.5 / 92.0 / 8.3 | 92.0 / 92.0 / 5.6 | 88.9 / 96.0 / 8.3 |
+| 질문 embedding p50 / 적재 메모리(`ollama ps`) | 16.9 ms / 673 MB | 13.3 ms / 346 MB | 13.4 ms / 346 MB | 13.3 ms / 346 MB |
+
+270m이 검색·B6에서 낮아 **기본값은 bge-m3 그대로**입니다. Citation·거절 정확도 등 생성 의존 지표와 전체 표는 ADR에 있고, 생성 지표는 0.24.0과 런타임이 달라 직접 비교하지 않습니다. **측정 안 함**: 문서별 실제 제목 접두어(`title: none`만 측정), 128차원, 740m(텍스트 벡터가 270m과 비트 단위로 같아 생략)와 그 멀티모달.
 
 ### 실제 프로토콜 (로컬 전용, 2026-10-09)
 
