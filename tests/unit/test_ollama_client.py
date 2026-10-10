@@ -86,3 +86,32 @@ async def test_client_errors_are_not_retried(client) -> None:
         await client.embed(["x"])
     assert err.value.error_type == "OLLAMA_BAD_REQUEST"
     assert route.call_count == 1
+
+
+@respx.mock
+async def test_embed_sends_dimensions_only_when_truncating() -> None:
+    route = respx.post(f"{BASE}/api/embed").respond(json={"embeddings": [[1.0, 0.0]]})
+    async with httpx.AsyncClient(base_url=BASE, timeout=5) as http:
+        full = OllamaClient(http, llm_model="g", embedding_model="eg2")
+        truncated = OllamaClient(
+            http, llm_model="g", embedding_model="eg2", embedding_truncate_dim=2
+        )
+        await full.embed(["a"])
+        await truncated.embed(["a"])
+    assert "dimensions" not in json.loads(route.calls[0].request.content)
+    assert json.loads(route.calls[1].request.content) == {
+        "model": "eg2",
+        "input": ["a"],
+        "dimensions": 2,
+    }
+
+
+@respx.mock
+async def test_generate_does_not_think_unless_asked(client) -> None:
+    route = respx.post(f"{BASE}/api/generate").respond(json={"response": "ok"})
+    await client.generate("q")
+    async with httpx.AsyncClient(base_url=BASE, timeout=5) as http:
+        thinking = OllamaClient(http, llm_model="g", embedding_model="e", think=True)
+        await thinking.generate("q")
+    assert json.loads(route.calls[0].request.content)["think"] is False
+    assert json.loads(route.calls[1].request.content)["think"] is True

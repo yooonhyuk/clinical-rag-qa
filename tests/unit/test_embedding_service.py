@@ -52,3 +52,11 @@ async def test_dimension_mismatch_is_a_typed_error() -> None:
     with pytest.raises(EmbeddingDimensionError) as err:
         await service.embed_query("q")
     assert err.value.error_type == "EMBEDDING_DIM_MISMATCH"
+
+
+async def test_truncated_dimension_is_enforced() -> None:
+    # a server that ignored `dimensions` would return the full vector -> typed error, not a
+    # silently mismatching column
+    service = EmbeddingService(SlowEmbedder(dim=768), dimension=256)
+    with pytest.raises(EmbeddingDimensionError):
+        await service.embed_query("q")

@@ -1,0 +1,43 @@
+{
+  "run_at": "2026-10-10T19:54:26",
+  "label": "embeddinggemma-2-270m-d256-exact-gemma4-e4b",
+  "corpus": "private",
+  "corpus_root": "local",
+  "corpus_classification": "licensed-local-only",
+  "corpus_sha256": "8487c910ed8d347f0a8bdd2e843ee41785cc49b824c26907790d5a5709ac1f1e",
+  "questions_file": "protocol_questions.yaml",
+  "questions_sha256": "16394c4a90f3f53ef357f24d993a8ebb195902c981b5f2eea245216496891853",
+  "git_commit": "3342ce5",
+  "provider": "ollama",
+  "generator_model": "gemma4:e4b",
+  "reranker": "none",
+  "partial_answers": true,
+  "rag_prompt_variant": "default",
+  "eval_process_max_rss_mb": 161,
+  "ollama_version": "0.40.2",
+  "embedding_model": "embeddinggemma-2:270m",
+  "embedding_dim": 256,
+  "embedding_truncate_dim": 256,
+  "embedding_query_prefix": "task: search result | query: ",
+  "embedding_document_prefix": "title: none | text: ",
+  "hybrid_search": false,
+  "top_k": 5,
+  "chunk_size": 1000,
+  "chunk_overlap": 150,
+  "min_relevance_score": -0.145,
+  "scope_classifier": "embedding",
+  "scope_margin": 0.0191,
+  "vector_search": "exact",
+  "hnsw_iterative_scan": "off",
+  "db_state": {
+    "chunks_by_corpus": {
+      "private": 8447,
+      "public": 2029,
+      "toy": 32
+    },
+    "hnsw_index": "CREATE INDEX chunks_embedding_hnsw ON public.chunks USING hnsw (embedding vector_cosine_ops)",
+    "hnsw_ef_search": "40",
+    "hnsw_iterative_scan_default": "off",
+    "pgvector": "0.8.0"
+  }
+}

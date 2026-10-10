@@ -16,7 +16,12 @@ class EmbeddingModelSpec:
     dimension: int
     query_prefix: str = ""
     document_prefix: str = ""
+    # Matryoshka-trained models: output sizes that keep the vector useful when truncated.
+    matryoshka_dims: tuple[int, ...] = ()
 
+
+_EG2_QUERY_PREFIX = "task: search result | query: "
+_EG2_DOCUMENT_PREFIX = "title: none | text: "
 
 # Defaults for embedding models we have measured. Any other Ollama embedding model works too,
 # but then EMBEDDING_DIM must be set explicitly (and the prefixes, if the model needs them).
@@ -26,6 +31,15 @@ KNOWN_EMBEDDING_MODELS: dict[str, EmbeddingModelSpec] = {
     # English WordPiece vocab (30,522 tokens, no Hangul syllables): every Korean word -> [UNK].
     # See docs/issues/001-korean-embedding-unk.md. Trained with task prefixes.
     "nomic-embed-text": EmbeddingModelSpec(768, "search_query: ", "search_document: "),
+    # EmbeddingGemma 2 (text only, Matryoshka 768/512/256/128). Prefixes follow the model card;
+    # the document title is not stored per chunk, so documents get `title: none`.
+    # Korean quality is not published - measured in docs/decisions/0002-embedding-model.md.
+    "embeddinggemma-2:270m": EmbeddingModelSpec(
+        768, _EG2_QUERY_PREFIX, _EG2_DOCUMENT_PREFIX, (512, 256, 128)
+    ),
+    "embeddinggemma-2:740m": EmbeddingModelSpec(
+        768, _EG2_QUERY_PREFIX, _EG2_DOCUMENT_PREFIX, (512, 256, 128)
+    ),
 }
 
 
@@ -45,6 +59,10 @@ class Settings(BaseSettings):
     # None = take the value from KNOWN_EMBEDDING_MODELS (required for unknown models).
     # Changing the dimension needs `make reset-embeddings` + reindex (vectors are not portable).
     embedding_dim: int | None = Field(default=None, ge=1, le=16000)
+    # Matryoshka truncation: ask Ollama (/api/embed `dimensions`) for the first N dimensions,
+    # L2-normalised. Only for models whose KNOWN_EMBEDDING_MODELS entry lists N. None = full size.
+    # EMBEDDING_DIM then follows N; changing it needs `make reset-embeddings` + reindex.
+    embedding_truncate_dim: int | None = Field(default=None, ge=1, le=16000)
     # Task prefixes (nomic-embed-text: "search_query: " / "search_document: ", bge-m3: "").
     embedding_query_prefix: str | None = None
     embedding_document_prefix: str | None = None
@@ -137,7 +155,7 @@ class Settings(BaseSettings):
     def _blank_path_means_none(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
 
-    @field_validator("embedding_dim", mode="before")
+    @field_validator("embedding_dim", "embedding_truncate_dim", mode="before")
     @classmethod
     def _blank_dim_means_auto(cls, value: object) -> object:
         # docker compose passes `EMBEDDING_DIM: ${EMBEDDING_DIM:-}` as an empty string
@@ -153,12 +171,21 @@ class Settings(BaseSettings):
                     f"{self.ollama_embedding_model!r} (known: {sorted(KNOWN_EMBEDDING_MODELS)})"
                 )
             spec = EmbeddingModelSpec(self.embedding_dim)
-        elif self.embedding_dim is not None and self.embedding_dim != spec.dimension:
+        size = spec.dimension
+        if self.embedding_truncate_dim is not None:
+            if self.embedding_truncate_dim not in spec.matryoshka_dims:
+                sizes = spec.matryoshka_dims or "none"
+                raise ValueError(
+                    f"EMBEDDING_TRUNCATE_DIM={self.embedding_truncate_dim} is not supported by "
+                    f"{self.ollama_embedding_model} (Matryoshka sizes: {sizes})"
+                )
+            size = self.embedding_truncate_dim
+        if self.embedding_dim is not None and self.embedding_dim != size:
             raise ValueError(
                 f"EMBEDDING_DIM={self.embedding_dim} does not match "
-                f"{self.ollama_embedding_model} ({spec.dimension}-dim)"
+                f"{self.ollama_embedding_model} ({size}-dim)"
             )
-        self.embedding_dim = spec.dimension
+        self.embedding_dim = size
         if self.embedding_query_prefix is None:
             self.embedding_query_prefix = spec.query_prefix
         if self.embedding_document_prefix is None:

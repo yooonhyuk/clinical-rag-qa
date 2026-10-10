@@ -52,6 +52,7 @@ import os
 import resource
 import subprocess
 import sys
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -198,6 +199,15 @@ async def run_question(
     )
 
 
+def ollama_version(base_url: str) -> str | None:
+    """Results of different Ollama versions are not comparable (scope.md rule 3)."""
+    try:
+        with urllib.request.urlopen(f"{base_url}/api/version", timeout=5) as resp:
+            return json.load(resp).get("version")
+    except (OSError, ValueError):
+        return None
+
+
 async def db_state(container: AppContainer) -> dict[str, Any]:
     """Chunks per corpus and HNSW parameters (docs/issues/009: results depend on both)."""
     from sqlalchemy import text
@@ -272,8 +282,12 @@ async def run_provider(
             "eval_process_max_rss_mb": round(
                 resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
             ),
+            "ollama_version": ollama_version(settings.ollama_base_url),
             "embedding_model": settings.ollama_embedding_model,
             "embedding_dim": settings.embedding_dimension,
+            "embedding_truncate_dim": settings.embedding_truncate_dim,
+            "embedding_query_prefix": settings.embedding_query_prefix,
+            "embedding_document_prefix": settings.embedding_document_prefix,
             "hybrid_search": settings.hybrid_search,
             "top_k": top_k,
             "chunk_size": settings.chunk_size,

@@ -109,3 +109,65 @@ async def test_rag_searches_only_the_configured_models_chunks() -> None:
     )
     await rag.retrieve(FakeSession(), "업로드 용량", top_k=3)
     assert seen == ["bge-m3"]
+
+
+def test_embeddinggemma2_gets_768_dims_and_task_prefixes() -> None:
+    for model in ("embeddinggemma-2:270m", "embeddinggemma-2:740m"):
+        s = _settings(ollama_embedding_model=model)
+        assert s.embedding_dimension == 768
+        assert s.embedding_truncate_dim is None
+        assert s.embedding_query_prefix == "task: search result | query: "
+        assert s.embedding_document_prefix == "title: none | text: "
+
+
+@pytest.mark.parametrize("dim", [512, 256, 128])
+def test_truncate_dim_sets_the_column_dimension(dim) -> None:
+    s = _settings(ollama_embedding_model="embeddinggemma-2:270m", embedding_truncate_dim=dim)
+    assert s.embedding_dimension == dim
+    # the explicit dimension may be given too, as long as it agrees
+    s = _settings(
+        ollama_embedding_model="embeddinggemma-2:270m",
+        embedding_truncate_dim=dim,
+        embedding_dim=dim,
+    )
+    assert s.embedding_dimension == dim
+
+
+@pytest.mark.parametrize(
+    ("kw", "fragment"),
+    [
+        ({"ollama_embedding_model": "bge-m3", "embedding_truncate_dim": 512}, "not supported"),
+        ({"ollama_embedding_model": "nomic-embed-text", "embedding_truncate_dim": 256}, "not supp"),
+        ({"ollama_embedding_model": "embeddinggemma-2:270m", "embedding_truncate_dim": 300}, "300"),
+        # larger than the model's own size is not a truncation
+        (
+            {"ollama_embedding_model": "embeddinggemma-2:270m", "embedding_truncate_dim": 1024},
+            "1024",
+        ),
+        (
+            {
+                "ollama_embedding_model": "embeddinggemma-2:270m",
+                "embedding_truncate_dim": 256,
+                "embedding_dim": 768,
+            },
+            "does not match",
+        ),
+        (
+            {
+                "ollama_embedding_model": "my-embedder",
+                "embedding_dim": 384,
+                "embedding_truncate_dim": 128,
+            },
+            "not supported",
+        ),
+    ],
+)
+def test_unsupported_truncate_combinations_are_rejected(kw, fragment) -> None:
+    with pytest.raises(ValidationError, match=fragment):
+        _settings(**kw)
+
+
+def test_blank_truncate_dim_means_full_size() -> None:
+    s = _settings(ollama_embedding_model="embeddinggemma-2:270m", embedding_truncate_dim="")
+    assert s.embedding_truncate_dim is None
+    assert s.embedding_dimension == 768

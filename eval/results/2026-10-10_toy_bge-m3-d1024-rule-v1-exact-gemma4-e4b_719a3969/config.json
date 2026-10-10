@@ -1,0 +1,43 @@
+{
+  "run_at": "2026-10-10T20:09:26",
+  "label": "bge-m3-d1024-rule-v1-exact-gemma4-e4b",
+  "corpus": "toy",
+  "corpus_root": "samples/documents",
+  "corpus_classification": "synthetic-sample",
+  "corpus_sha256": "719a3969baacdd3013ca04f0646bef35de2180cf9bc092b3b3896eb022031417",
+  "questions_file": "questions.yaml",
+  "questions_sha256": "19e9dfb63fcf82cf5ddc9204c3ab225575fc719d04014630d463538db8720ada",
+  "git_commit": "3342ce5",
+  "provider": "ollama",
+  "generator_model": "gemma4:e4b",
+  "reranker": "none",
+  "partial_answers": true,
+  "rag_prompt_variant": "default",
+  "eval_process_max_rss_mb": 140,
+  "ollama_version": "0.40.2",
+  "embedding_model": "bge-m3",
+  "embedding_dim": 1024,
+  "embedding_truncate_dim": null,
+  "embedding_query_prefix": "",
+  "embedding_document_prefix": "",
+  "hybrid_search": false,
+  "top_k": 5,
+  "chunk_size": 1000,
+  "chunk_overlap": 150,
+  "min_relevance_score": -0.235,
+  "scope_classifier": "embedding",
+  "scope_margin": 0.056,
+  "vector_search": "exact",
+  "hnsw_iterative_scan": "off",
+  "db_state": {
+    "chunks_by_corpus": {
+      "private": 8447,
+      "public": 2029,
+      "toy": 32
+    },
+    "hnsw_index": "CREATE INDEX chunks_embedding_hnsw ON public.chunks USING hnsw (embedding vector_cosine_ops)",
+    "hnsw_ef_search": "40",
+    "hnsw_iterative_scan_default": "off",
+    "pgvector": "0.8.0"
+  }
+}

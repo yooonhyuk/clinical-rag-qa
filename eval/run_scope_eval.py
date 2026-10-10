@@ -38,6 +38,9 @@ from app.services.scope_classifier import (  # noqa: E402
     request_regex,
 )
 
+sys.path.insert(0, str(ROOT / "eval"))
+from run_eval import ollama_version  # noqa: E402
+
 HELDOUT = ROOT / "eval" / "scope_heldout.yaml"
 RESULTS = ROOT / "eval" / "results"
 
@@ -115,6 +118,7 @@ async def main() -> int:
         settings.ollama_base_url,
         llm_model=settings.ollama_llm_model,
         embedding_model=settings.ollama_embedding_model,
+        embedding_truncate_dim=settings.embedding_truncate_dim,
         timeout_sec=settings.ollama_timeout_sec,
         max_retries=settings.ollama_max_retries,
     )
@@ -147,6 +151,9 @@ async def main() -> int:
     summary: dict[str, Any] = {
         "run_at": datetime.now().isoformat(timespec="seconds"),
         "embedding_model": settings.ollama_embedding_model,
+        "embedding_dim": settings.embedding_dimension,
+        "embedding_truncate_dim": settings.embedding_truncate_dim,
+        "ollama_version": ollama_version(settings.ollama_base_url),
         "k": k,
         "exemplars": {"out_of_scope": len(pos), "in_scope": len(neg)},
         "heldout": {
@@ -190,6 +197,8 @@ async def main() -> int:
     if not args.no_write:
         stamp = datetime.now().strftime("%Y-%m-%d")
         model = settings.ollama_embedding_model.replace(":", "-")
+        if settings.embedding_truncate_dim:
+            model += f"-{settings.embedding_truncate_dim}d"
         out = RESULTS / f"{stamp}_scope-b6_{model}_{summary['heldout']['sha256']}"
         out.mkdir(parents=True, exist_ok=True)
         (out / "summary.json").write_text(

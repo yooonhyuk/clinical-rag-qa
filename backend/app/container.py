@@ -102,6 +102,7 @@ def build_container(
             settings.ollama_base_url,
             llm_model=settings.ollama_llm_model,
             embedding_model=settings.ollama_embedding_model,
+            embedding_truncate_dim=settings.embedding_truncate_dim,
             timeout_sec=settings.ollama_timeout_sec,
             max_retries=settings.ollama_max_retries,
         )

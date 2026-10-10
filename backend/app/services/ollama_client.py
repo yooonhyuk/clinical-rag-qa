@@ -49,12 +49,20 @@ class OllamaClient:
         *,
         llm_model: str,
         embedding_model: str,
+        embedding_truncate_dim: int | None = None,
+        think: bool = False,
         max_retries: int = 3,
         backoff_base_sec: float = 0.5,
     ) -> None:
         self._http = http
         self.model = llm_model
         self.embedding_model = embedding_model
+        # Matryoshka: Ollama (>= 0.40) returns the first N dimensions, L2-normalised.
+        self._embedding_truncate_dim = embedding_truncate_dim
+        # Ollama >= 0.40 turns thinking on by default for models that support it (gemma4:e4b:
+        # ~600 extra tokens per answer, ~10x slower). Earlier versions did not think, and the
+        # measured RAG answers were produced without it, so it stays off unless asked for.
+        self._think = think
         self._max_retries = max_retries
         self._backoff_base_sec = backoff_base_sec
 
@@ -65,19 +73,26 @@ class OllamaClient:
         *,
         llm_model: str,
         embedding_model: str,
+        embedding_truncate_dim: int | None = None,
         timeout_sec: float,
         max_retries: int,
     ) -> "OllamaClient":
         http = httpx.AsyncClient(base_url=base_url, timeout=httpx.Timeout(timeout_sec))
         return cls(
-            http, llm_model=llm_model, embedding_model=embedding_model, max_retries=max_retries
+            http,
+            llm_model=llm_model,
+            embedding_model=embedding_model,
+            embedding_truncate_dim=embedding_truncate_dim,
+            max_retries=max_retries,
         )
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        payload = {"model": self.embedding_model, "input": texts}
+        payload: dict[str, Any] = {"model": self.embedding_model, "input": texts}
+        if self._embedding_truncate_dim is not None:
+            payload["dimensions"] = self._embedding_truncate_dim
         data = await self._request("POST", "/api/embed", json=payload)
         embeddings = data.get("embeddings")
         if not isinstance(embeddings, list) or len(embeddings) != len(texts):
@@ -112,6 +127,7 @@ class OllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "think": self._think,
             # Low temperature: answers should stick to the retrieved context.
             "options": {"temperature": 0.1},
         }
