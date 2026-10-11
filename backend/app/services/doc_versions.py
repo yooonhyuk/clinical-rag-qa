@@ -4,13 +4,17 @@ Several editions of one document in a corpus make search return the old edition 
 quote it as if it were current (docs/issues/005, docs/decisions/0006-document-versions.md).
 
 Two sources, the explicit one wins:
-1. `.corpus.yaml` `versions:` - entries `{match, family, version, date, superseded}`; `match` is
+1. `versions:` of `.corpus.yaml`, then of `.versions.yaml` (same format; the first matching entry
+   in that order wins) - entries `{match, family, version, date, superseded}`; `match` is
    a glob against the path relative to the corpus root (or just the file name).
 2. The file name: a version token (`v2.1`, `ver 3`, `Rev6`, `(R3)`, `E6R3`, `Amendment 2`, `개정`,
    `최종`). A bare `R1`/`R01` is an identifier, not an edition. What is left after removing the
    tokens, with the folder it sits in, is the `family` key. A date alone is NOT an edition
    (minutes, visit reports and lot records differ by date): it is kept for display, the name has
    no family and nothing is hidden. A name without any token is a standalone document.
+
+A name carrying two tokens of the same kind (`v2.1 v2.2`, `Rev5->Rev6`) is a change document
+between editions: it is standalone, never an edition of a family.
 
 Latest = nobody in the same (corpus, family) is strictly newer. Versions compare numerically
 within one kind (v / R / Amendment). A date is compared only when both documents got it from the
@@ -169,10 +173,25 @@ def infer_from_filename(file_name: str) -> VersionInfo:
     """Version and family from the file name alone. No edition token -> no family (standalone);
     a date alone is kept as the date but never makes a family."""
     text, found, when = _scan(_strip_suffix(file_name))
+    kinds = [kind for _, _, kind in found if kind is not None]
+    if len(kinds) != len(set(kinds)):
+        # "Change table v2.1 v2.2" / "Rev5->Rev6": a document ABOUT a change between editions,
+        # not an edition of either; reading the first token would rank it against the editions
+        found = []
     if not found:
         return VersionInfo() if when is None else VersionInfo(date=when, source="filename")
     label = " ".join(piece for _, piece, _ in sorted(found)) or None
     return VersionInfo(family=_family_key(text), label=label, date=when, source="filename")
+
+
+def name_core(file_name: str) -> str | None:
+    """The file name without edition tokens and dates, normalised (no folder). None for a name with
+    two tokens of one kind (a change document) or nothing left; used to propose families."""
+    text, found, _ = _scan(_strip_suffix(file_name))
+    kinds = [kind for _, _, kind in found if kind is not None]
+    if len(kinds) != len(set(kinds)):
+        return None
+    return _family_key(text)
 
 
 def parse_manifest(raw: object) -> list[ManifestEntry]:

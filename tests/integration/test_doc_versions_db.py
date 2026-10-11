@@ -286,3 +286,86 @@ async def test_api_exposes_the_edition_and_include_superseded(session_factory, t
         # file type filter now knows docx / xlsx (no such documents here: empty, not a 422)
         res = await c.post("/api/retrieve", json={**body, "fileType": "docx"})
         assert res.status_code == 200 and res.json()["chunks"] == []
+
+
+async def test_versions_yaml_states_dates_and_removing_it_restores_both_as_latest(
+    session_factory, tmp_path
+) -> None:
+    root = tmp_path / "docs"
+    _write(root, "sample form v1.0 a.md")
+    _write(root, "sample form v1.0 b.md")
+    await _pipeline(session_factory).run(root)
+    assert set((await _flags(session_factory)).values()) == {True}  # same edition, no dates
+
+    (root / ".versions.yaml").write_text(
+        "versions:\n"
+        "  - {match: 'sample form v1.0 a.md', family: form, version: v1.0, date: 2025-01-01}\n"
+        "  - {match: 'sample form v1.0 b.md', family: form, version: v1.0, date: 2025-03-01}\n",
+        encoding="utf-8",
+    )
+    await _pipeline(session_factory).run(root)
+    assert await _flags(session_factory) == {
+        "sample form v1.0 a.md": False,
+        "sample form v1.0 b.md": True,
+    }
+    assert await _names(session_factory, latest_only=True) == {"sample form v1.0 b.md"}
+
+    (root / ".versions.yaml").unlink()
+    await _pipeline(session_factory).run(root)
+    assert set((await _flags(session_factory)).values()) == {True}
+
+
+async def test_corpus_yaml_entry_wins_over_versions_yaml(session_factory, tmp_path) -> None:
+    root = tmp_path / "docs"
+    _write(root, "guide a.md")
+    _write(root, "guide b.md")
+    (root / ".corpus.yaml").write_text(
+        "name: docs\nversions:\n  - {match: 'guide a.md', family: G, version: v2}\n",
+        encoding="utf-8",
+    )
+    (root / ".versions.yaml").write_text(
+        "versions:\n"
+        "  - {match: 'guide a.md', family: G, version: v1}\n"  # shadowed by .corpus.yaml
+        "  - {match: 'guide b.md', family: G, version: v1}\n",
+        encoding="utf-8",
+    )
+    await _pipeline(session_factory).run(root)
+    assert await _flags(session_factory) == {"guide a.md": True, "guide b.md": False}
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        "versions: [unclosed\n",
+        "- just\n- a list\n",
+        "versions: not-a-list\n",
+        "versions:\n  - {match: 'sample guide v1.md', family: g, date: 2025-02-30}\n",
+        "versions:\n  - {match: 'sample guide v1.md', family: g, date: 2025-13-01}\n",
+        "versions:\n  - {match: 'sample guide v1.md', family: g, date: !!timestamp nope}\n",
+        "versions:\n  - {match: 'sample guide v1.md', family: g, date: !!bool maybe}\n",
+    ],
+)
+async def test_broken_versions_yaml_warns_and_falls_back_to_filenames(
+    session_factory, tmp_path, caplog, broken
+) -> None:
+    root = tmp_path / "docs"
+    _write(root, "sample guide v1.md")
+    _write(root, "sample guide v2.md")
+    (root / ".versions.yaml").write_text(broken, encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        job = await _pipeline(session_factory).run(root)
+    assert job.status == "COMPLETED" and job.indexed == 2
+    assert any(".versions.yaml ignored" in r.getMessage() for r in caplog.records)
+    assert await _flags(session_factory) == {
+        "sample guide v1.md": False,
+        "sample guide v2.md": True,
+    }
+
+
+async def test_versions_yaml_is_not_indexed_as_a_document(session_factory, tmp_path) -> None:
+    root = tmp_path / "docs"
+    _write(root, "only doc.md")
+    (root / ".versions.yaml").write_text("versions: []\n", encoding="utf-8")
+    job = await _pipeline(session_factory).run(root)
+    assert job.total == 1
+    assert set(await _flags(session_factory)) == {"only doc.md"}

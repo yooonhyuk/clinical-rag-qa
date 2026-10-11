@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -22,6 +23,7 @@ from app.models import Chunk, Document, DocumentStatus, IndexJob
 from app.models.base import utcnow
 from app.services.chunker import chunk_sections
 from app.services.doc_versions import (
+    ManifestEntry,
     VersionInfo,
     latest_flags,
     parse_manifest,
@@ -69,6 +71,35 @@ class _DocumentFailure(Exception):
         self.error_type = error_type
 
 
+VERSIONS_FILE = ".versions.yaml"
+
+
+def _read_versions_file(root: Path) -> list[ManifestEntry]:
+    """`versions:` of `<root>/.versions.yaml`; a broken file warns and counts as absent."""
+    path = root / VERSIONS_FILE
+    if not path.is_file():
+        return []
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # YAML/date/bytes errors, incl. explicit tags (!!timestamp nope)
+        logger.warning(
+            "%s ignored (not readable YAML: %s); versions come from file names", path, exc
+        )
+        return []
+    if not isinstance(data, dict) or not isinstance(data.get("versions", []), list):
+        logger.warning("%s ignored (expected a mapping with a `versions:` list)", path)
+        return []
+    return parse_manifest(data.get("versions"))
+
+
+def _read_manifest(root: Path, marker_file: str) -> list[ManifestEntry]:
+    """`.corpus.yaml` entries first (they match first), then `.versions.yaml`."""
+    return [
+        *parse_manifest(read_marker(root, marker_file).get("versions")),
+        *_read_versions_file(root),
+    ]
+
+
 class IndexingPipeline:
     def __init__(
         self,
@@ -94,7 +125,7 @@ class IndexingPipeline:
         files = await asyncio.to_thread(scan_documents, root, include)
         corpus = corpus or corpus_name(root, self._marker_file)
         classification = corpus_classification(root, self._marker_file)
-        manifest = parse_manifest(read_marker(root, self._marker_file).get("versions"))
+        manifest = _read_manifest(root, self._marker_file)
 
         async with self._session_factory() as session:
             job = IndexJob(
