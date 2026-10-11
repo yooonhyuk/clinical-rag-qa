@@ -61,7 +61,7 @@ backend/app/
               deid_policy.yaml (사이트 정책) · scope_exemplars.yaml (B6 분류기 예시 80개)
   cli/        dicom_scan.py (폴더 일괄 검사)
 backend/alembic/versions/  0001_initial_schema · 0002_ask_log_llm_usage · 0003_pg_trgm
-                           0004_embedding_model_tracking · 0005_document_corpus · 0007_document_versions
+                           0004_embedding_model_tracking · 0005_document_corpus · 0006_document_classification · 0007_document_versions
 frontend/streamlit_app.py · no_egress_entrypoint.py (폐쇄망 ui: default route 제거 후 권한 하강)
 eval/       questions.yaml (toy 25문항) · public_questions.yaml (공개 99문항) · scope_heldout.yaml (B6 61문항)
             eval_metrics.py · run_eval.py · run_scope_eval.py · tune_gate.py(rerank 게이트 dev 조정) · results/ (날짜·설정·코퍼스 해시별 결과, 커밋함)
@@ -398,6 +398,8 @@ uv run --project backend python scripts/draft_versions.py ~/my-corpus --out /tmp
 cp /tmp/versions.draft.yaml ~/my-corpus/.versions.yaml   # 형식은 .corpus.yaml의 versions: 와 같음
 ```
 초안은 숨김을 확정하지 않습니다(`superseded` 없음). 파일명 날짜는 `# date: ...` 주석으로만 적혀 있어, 그대로 적용하면 판 번호로만 최신이 정해지고 날짜로는 아무것도 숨겨지지 않습니다(같은 문서의 판이 맞을 때만 그 줄의 `# ` 두 글자만 지우세요. 날짜만 다른 회의록·방문 보고서는 별개 문서입니다). `.corpus.yaml` 항목이 먼저 매칭되고, `.versions.yaml`이 깨져 있으면(없는 날짜 `2025-02-30`, 잘못된 `!!` 태그 포함) 경고만 남기고 추정으로 대체합니다. 지우고 재색인하면 추정으로 돌아갑니다. 흐름: [ADR 0006](docs/decisions/0006-document-versions.md).
+
+실제 업무 문서 87건(로컬, 집계만)에서는 파일명 추정이 옛 판 71건 중 9건만 숨겨 정답 파일 top-5가 21 → 24/42, 초안을 그대로 적용하면 26/42였고, 최신판 목록(16건)을 지정하면 39/42였습니다. 어느 단계에서도 최신판은 숨겨지지 않았지만, 초안에서 확인 결과까지 운영자가 바꿀 판정이 58건이라 이 문서들에서는 최신판을 직접 고르는 편이 일이 적습니다. 상세: [docs/journey.md](docs/journey.md) §16.
 
 ### 실제 업무 문서: 변환 없이 바로 색인 (로컬 전용, 2026-10-11)
 
