@@ -1,0 +1,73 @@
+{
+ "what": "local-only work documents re-measured after docx/xlsx loaders (#17) and one-row table fix (#20). Aggregates only: no file names, questions, answers or text.",
+ "env": {
+  "ollama": "0.40.2",
+  "embedding": "bge-m3",
+  "vector_search": "exact",
+  "reranker": "none",
+  "top_k": 5,
+  "db": "disposable pgvector/pgvector:0.8.0-pg16"
+ },
+ "ingest_all_87": {
+  "before_2026-10-09": {
+   "indexed": 21,
+   "failed": 66,
+   "failed_by_reason": {
+    "xlsx:UNSUPPORTED_FILE_TYPE": 35,
+    "docx:UNSUPPORTED_FILE_TYPE": 25,
+    "pdf:ENCRYPTED_PDF": 5,
+    "doc:UNSUPPORTED_FILE_TYPE": 1
+   },
+   "chunks": 1776
+  },
+  "after": {
+   "indexed": 86,
+   "failed": 1,
+   "chunks": 16950,
+   "seconds": 718.7,
+   "by_type_error": {
+    "pdf:ok": 26,
+    "docx:ok": 25,
+    "xlsx:ok": 35,
+    "doc:UNSUPPORTED_FILE_TYPE": 1
+   }
+  }
+ },
+ "extraction_parity_vs_old_converted_markdown": {
+  "files": 60,
+  "unique_token_recall": {
+   "median": 1.0,
+   "p10": 0.997,
+   "min": 0.984,
+   "below_0.99": 1
+  },
+  "multiset_token_recall": {
+   "median": 0.999,
+   "p10": 0.928,
+   "min": 0.811,
+   "below_0.9": 4
+  },
+  "note": "multiset recall is lower, probably (not verified) because a first table row with an empty cell is not used as a header, so header names are not repeated on every row; file-name tokens are excluded from the unique-token figure"
+ },
+ "retrieval_gold_file_top5_latest_versions": {
+  "original_files_new_loaders": {
+   "hit": 39,
+   "n": 42,
+   "docs_indexed": 15,
+   "chunks": 1529
+  },
+  "old_converted_markdown": {
+   "hit": 37,
+   "n": 42,
+   "docs_indexed": 16,
+   "chunks": 1505
+  },
+  "overlap": {
+   "both": 36,
+   "original_only": 3,
+   "converted_only": 1
+  },
+  "note": "same code (main 0ca50d6), same Ollama, exact search. The one .doc stays unsupported in the original set. Earlier HNSW runs on Ollama 0.24.0 (as-is 11/42, converted 31/42) are not directly comparable."
+ },
+ "not_measured": "answer correctness (needs reading answers), reranker on, all-versions corpus retrieval"
+}
