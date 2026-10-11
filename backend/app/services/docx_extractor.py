@@ -341,6 +341,9 @@ def _table_lines(tbl: ET.Element, budget: TextBudget, depth: int) -> list[str]:
         # upper bound of the line: every header name, every value and a "h: v; " separator
         budget.spend(header_size + sum(utf8_size(c) + 4 for c in row))
         lines.extend(rows_to_lines(header, [row]))
+    if header and not lines:
+        # a one-row table (a boxed note, a title block) has no body for its "header": keep its text
+        lines.append(" | ".join(c for c in header[0] if c))
     return lines
 
 

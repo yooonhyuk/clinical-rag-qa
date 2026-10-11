@@ -85,6 +85,14 @@ def test_table_rows_merged_cells_and_header_rule(tmp_path: Path) -> None:
     assert extract(_docx(tmp_path / "n.docx", no_header), "docx")[0].text == "x\n1 | 2"
 
 
+def test_one_row_table_keeps_its_text(tmp_path: Path) -> None:
+    # a boxed note or title block: the only row must not be consumed as a header of nothing
+    boxed = "<w:tbl>" + _tr(_tc("주의"), _tc("판독 전 영상 품질 확인")) + "</w:tbl>"
+    body = _p("앞 문단") + boxed + _p("뒤 문단")
+    text = extract(_docx(tmp_path / "b.docx", body), "docx")[0].text
+    assert text.splitlines() == ["앞 문단", "주의 | 판독 전 영상 품질 확인", "뒤 문단"]
+
+
 def test_tracked_changes_keep_insertions_drop_deletions_and_skip_notes(tmp_path: Path) -> None:
     body = (
         "<w:p><w:r><w:t>결과는 </w:t></w:r>"
