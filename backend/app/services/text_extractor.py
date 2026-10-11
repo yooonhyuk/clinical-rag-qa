@@ -1,16 +1,18 @@
-"""Text extraction dispatch: Markdown / TXT / text-PDF / JATS XML / HTML.
+"""Text extraction dispatch: Markdown / TXT / text-PDF / JATS XML / HTML / DOCX / XLSX.
 
 All functions are blocking (run via `asyncio.to_thread`). Format-specific extractors live in
-pdf_extractor (pypdf), jats_extractor and html_extractor (standard library only).
+pdf_extractor (pypdf), jats/html/docx/xlsx extractors (standard library only).
 """
 
 import re
 from pathlib import Path
 
 from app.services.document_types import ExtractionError, Section
+from app.services.docx_extractor import extract_docx
 from app.services.html_extractor import extract_html
 from app.services.jats_extractor import extract_jats
 from app.services.pdf_extractor import extract_pdf
+from app.services.xlsx_extractor import extract_xlsx
 
 __all__ = ["ExtractionError", "Section", "extract", "extract_markdown", "extract_text"]
 
@@ -72,6 +74,15 @@ def extract(path: Path, file_type: str) -> list[Section]:
             sections = extract_jats(path)
         case "html":
             sections = extract_html(path)
+        case "docx":
+            sections = extract_docx(path)
+        case "xlsx":
+            sections = extract_xlsx(path)
+        case "doc":
+            raise ExtractionError(
+                "UNSUPPORTED_FILE_TYPE",
+                "Legacy .doc is not supported: save it as .docx and add it again",
+            )
         case _:
             raise ExtractionError("UNSUPPORTED_FILE_TYPE", f"Unsupported file type: {file_type}")
     if not sections:

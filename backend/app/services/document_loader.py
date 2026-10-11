@@ -13,6 +13,10 @@ SUPPORTED_EXTENSIONS: dict[str, str] = {
     ".xml": "xml",  # JATS full-text articles
     ".html": "html",
     ".htm": "html",
+    ".docx": "docx",
+    ".xlsx": "xlsx",
+    # legacy binary Word: routed to the extractor only to fail with a "re-save as docx" hint
+    ".doc": "doc",
 }
 
 
@@ -36,7 +40,7 @@ def sha256_of(path: Path, chunk_size: int = 1 << 20) -> str:
 
 
 def scan_documents(root: Path, include: tuple[str, ...] | None = None) -> list[DiscoveredFile]:
-    """Recursively list every non-hidden file under `root`, sorted by path.
+    """Recursively list every non-hidden file under `root` (not Office `~$` locks), by path.
 
     `include` (from the corpus marker) limits the scan to files matching any of the glob
     patterns relative to `root`, e.g. ("protocols/*.pdf", "originals/*.pdf"): a corpus folder
@@ -48,6 +52,8 @@ def scan_documents(root: Path, include: tuple[str, ...] | None = None) -> list[D
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         relative = path.relative_to(root)
         if any(part.startswith(".") for part in relative.parts):
+            continue
+        if path.name.startswith("~$"):  # Office lock file next to an open document
             continue
         if include is not None and not any(relative.match(pattern) for pattern in include):
             continue

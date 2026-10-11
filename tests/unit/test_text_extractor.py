@@ -127,8 +127,27 @@ def test_empty_markdown_fails(tmp_path: Path) -> None:
 
 
 def test_unsupported_type(tmp_path: Path) -> None:
-    path = tmp_path / "x.docx"
+    path = tmp_path / "x.pptx"
     path.write_bytes(b"PK")
     with pytest.raises(ExtractionError) as err:
-        extract(path, "docx")
+        extract(path, "pptx")
     assert err.value.error_type == "UNSUPPORTED_FILE_TYPE"
+
+
+def test_legacy_doc_gets_a_resave_hint(tmp_path: Path) -> None:
+    path = tmp_path / "old.doc"
+    path.write_bytes(b"\xd0\xcf\x11\xe0")
+    with pytest.raises(ExtractionError, match="docx") as err:
+        extract(path, "doc")
+    assert err.value.error_type == "UNSUPPORTED_FILE_TYPE"
+
+
+def test_aes_pdf_with_owner_password_only_opens(tmp_path: Path) -> None:
+    path = _pdf(
+        tmp_path / "signed.pdf",
+        ["서명본 본문"],
+        encryption=pymupdf.PDF_ENCRYPT_AES_128,
+        owner_pw="owner",
+        user_pw="",
+    )
+    assert "서명본 본문" in extract(path, "pdf")[0].text

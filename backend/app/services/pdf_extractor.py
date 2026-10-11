@@ -107,8 +107,9 @@ def read_pdf_pages(path: Path) -> list[str]:
     try:
         reader = PdfReader(path)
     except (DependencyError, FileNotDecryptedError) as exc:
-        # pypdf tries the empty password while opening; AES needs the optional `cryptography`
-        # package, which we do not ship: an AES-encrypted PDF is reported as encrypted.
+        # pypdf tries the empty password while opening. AES decryption needs `cryptography`
+        # (a default dependency, ADR 0001), so a signed/permission-only AES PDF opens; this
+        # branch only sees a PDF that really needs an open password (or a broken install).
         raise ExtractionError("ENCRYPTED_PDF", "PDF is encrypted") from exc
     except (PdfReadError, OSError, ValueError) as exc:
         raise ExtractionError("CORRUPTED_FILE", f"Cannot open PDF: {exc}") from exc

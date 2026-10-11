@@ -9,12 +9,12 @@ def test_scan_is_recursive_skips_hidden_and_flags_unsupported(tmp_path: Path) ->
     (tmp_path / "sub").mkdir()
     (tmp_path / "a.md").write_text("# A", encoding="utf-8")
     (tmp_path / "sub" / "b.TXT").write_text("b", encoding="utf-8")
-    (tmp_path / "c.docx").write_bytes(b"PK")
+    (tmp_path / "c.pptx").write_bytes(b"PK")
     (tmp_path / ".corpus.yaml").write_text("classification: synthetic-sample")
     files = {f.file_name: f for f in scan_documents(tmp_path)}
-    assert set(files) == {"a.md", "b.TXT", "c.docx"}
+    assert set(files) == {"a.md", "b.TXT", "c.pptx"}
     assert files["b.TXT"].file_type == "txt" and files["b.TXT"].supported
-    assert files["c.docx"].file_type == "docx" and not files["c.docx"].supported
+    assert files["c.pptx"].file_type == "pptx" and not files["c.pptx"].supported
 
 
 def test_identical_content_has_identical_checksum(tmp_path: Path) -> None:
@@ -43,3 +43,9 @@ def test_include_globs_limit_the_scan(tmp_path: Path) -> None:
         "protocols/a.pdf",
     ]
     assert len(scan_documents(tmp_path)) == 5  # no include = every non-hidden file
+
+
+def test_scan_skips_office_lock_files(tmp_path: Path) -> None:
+    (tmp_path / "~$report.docx").write_bytes(b"\x00" * 16)
+    (tmp_path / "report.docx").write_bytes(b"PK")
+    assert [f.file_name for f in scan_documents(tmp_path)] == ["report.docx"]
