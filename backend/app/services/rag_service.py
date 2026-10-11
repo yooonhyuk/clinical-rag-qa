@@ -38,7 +38,11 @@ from app.services.llm_types import (
     ModelRefusalError,
     StructuredOutputError,
 )
-from app.services.prompt_builder import build_inline_rag_prompt, build_rag_prompt
+from app.services.prompt_builder import (
+    build_inline_rag_prompt,
+    build_rag_prompt,
+    format_version,
+)
 from app.services.reranker import Reranker, rerank_chunks
 from app.services.scope_classifier import (
     MVP1_OUT_OF_SCOPE_RE,
@@ -82,6 +86,8 @@ class AskResult:
     # answered from part of the evidence: the model flagged insufficient evidence but cited it
     partial: bool = False
     caveat: str | None = None
+    # old editions were allowed into the search and a cited chunk comes from one
+    superseded_warning: str | None = None
     meta: dict[str, object] = field(default_factory=dict)
 
 
@@ -128,6 +134,20 @@ async def corpus_classifications(session: AsyncSession, corpus: str) -> set[str 
     return set(rows.all())
 
 
+def superseded_warning(sources: list[RetrievedChunk]) -> str | None:
+    """Names the old editions among the cited chunks (only possible when they were searched)."""
+    old: list[str] = []
+    for chunk in sources:
+        if chunk.is_latest:
+            continue
+        label = f"{chunk.file_name} {format_version(chunk) or ''}".strip()
+        if label not in old:
+            old.append(label)
+    if not old:
+        return None
+    return f"옛 판({', '.join(old)}) 내용 포함: 최신판이 아닌 문서를 근거로 한 답변입니다."
+
+
 def _elapsed_ms(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
 
@@ -150,6 +170,7 @@ class RagService:
         partial_answers: bool = True,
         inline_instructions: bool = False,
         exact_search: bool = False,
+        latest_only: bool = True,
         hnsw_iterative_scan: str = "off",
         hnsw_ef_search: int | None = None,
         corpus_lookup: Callable[[AsyncSession, str], Awaitable[set[str | None]]] | None = None,
@@ -169,6 +190,7 @@ class RagService:
         # eval-only prompt variant: `system_prompt` goes into the user turn, no system message
         self._inline_instructions = inline_instructions
         self._exact_search = exact_search
+        self._latest_only = latest_only
         self._iterative_scan = hnsw_iterative_scan
         self._ef_search = hnsw_ef_search
         # External generator: only documents of non-sensitive corpora may reach the prompt.
@@ -187,12 +209,20 @@ class RagService:
         top_k: int,
         file_type: str | None = None,
         corpus: str | None = None,
+        include_superseded: bool = False,
     ) -> tuple[list[RetrievedChunk], int]:
         await self._check_corpus(session, corpus)
         start = time.perf_counter()
         query_vector = await self._embeddings.embed_query(question)
         chunks, _, retrieval_ms = await self._retrieve_with(
-            session, question, query_vector, start, top_k=top_k, file_type=file_type, corpus=corpus
+            session,
+            question,
+            query_vector,
+            start,
+            top_k=top_k,
+            file_type=file_type,
+            corpus=corpus,
+            include_superseded=include_superseded,
         )
         return chunks, retrieval_ms
 
@@ -218,12 +248,15 @@ class RagService:
         top_k: int,
         file_type: str | None,
         corpus: str | None,
+        include_superseded: bool = False,
     ) -> tuple[list[RetrievedChunk], float | None, int]:
         """(top_k chunks, best cosine among all candidates, elapsed ms)."""
         n = max(top_k, self._rerank_candidates) if self._reranker else top_k
         options: dict[str, object] = {}
         if self._classifications is not None:
             options["classifications"] = self._classifications
+        if self._latest_only and not include_superseded:
+            options["latest_only"] = True
         if self._exact_search:
             options["exact"] = True
         else:
@@ -270,6 +303,7 @@ class RagService:
         top_k: int,
         file_type: str | None = None,
         corpus: str | None = None,
+        include_superseded: bool = False,
     ) -> AskResult:
         await self._check_corpus(session, corpus)
         # Layer 1 (precise regex) refuses before any model call.
@@ -286,7 +320,14 @@ class RagService:
             )
 
         retrieved, best_cosine, retrieval_ms = await self._retrieve_with(
-            session, question, query_vector, start, top_k=top_k, file_type=file_type, corpus=corpus
+            session,
+            question,
+            query_vector,
+            start,
+            top_k=top_k,
+            file_type=file_type,
+            corpus=corpus,
+            include_superseded=include_superseded,
         )
         evidence = self._evidence(retrieved, best_cosine)
         gate = {
@@ -398,6 +439,7 @@ class RagService:
             usage=usage,
             partial=partial,
             caveat=PARTIAL_CAVEAT if partial else None,
+            superseded_warning=superseded_warning(sources),
         )
         result.meta["schemaValid"] = schema_valid
         return result
@@ -439,6 +481,9 @@ class RagService:
                         "rerankScore": (
                             None if c.rerank_score is None else round(c.rerank_score, 4)
                         ),
+                        "versionLabel": c.version_label,
+                        "versionDate": c.version_date.isoformat() if c.version_date else None,
+                        "isLatest": c.is_latest,
                     }
                     for c in result.sources
                 ],

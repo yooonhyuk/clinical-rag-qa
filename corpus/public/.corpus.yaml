@@ -6,3 +6,14 @@
 # local-only (LLM_PROVIDER=ollama), and the eval in this repo never uses an external provider.
 name: public
 classification: public-regulatory
+# Editions (services/doc_versions.py, docs/decisions/0006-document-versions.md): the Korean
+# MFDS guide 05 is the E6(R2) text that E6(R3) replaced. Search reads only the latest edition by
+# default; documents not listed here have no edition and are always searched.
+versions:
+  - match: "02_ich_e6r3_2025.pdf"
+    family: "ICH E6 GCP"
+    version: "R3"
+  - match: "05_mfds_ich_gcp_ko.pdf"
+    family: "ICH E6 GCP"
+    version: "R2"
+    superseded: true

@@ -26,6 +26,7 @@ top-k then depends on the graph, i.e. on insertion order (docs/issues/009).
 import uuid
 from collections.abc import Collection
 from dataclasses import dataclass
+from datetime import date
 from typing import Literal
 
 from sqlalchemy import Select, func, select, text
@@ -47,9 +48,21 @@ class RetrievedChunk:
     score: float  # cosine similarity (1 - cosine distance)
     lexical_score: float | None = None  # pg_trgm word_similarity(question, text), hybrid only
     rerank_score: float | None = None  # cross-encoder relevance (0..1), reranker only
+    # edition of the document (documents.version_*, services/doc_versions.py)
+    version_label: str | None = None
+    version_date: date | None = None
+    is_latest: bool = True
 
 
-def _to_chunk(chunk: Chunk, file_name: str, score: float, lexical: float | None) -> RetrievedChunk:
+def _to_chunk(
+    chunk: Chunk,
+    file_name: str,
+    version_label: str | None,
+    version_date: date | None,
+    is_latest: bool,
+    score: float,
+    lexical: float | None = None,
+) -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=chunk.id,
         document_id=chunk.document_id,
@@ -61,6 +74,9 @@ def _to_chunk(chunk: Chunk, file_name: str, score: float, lexical: float | None)
         text=chunk.text,
         score=float(score),
         lexical_score=None if lexical is None else float(lexical),
+        version_label=version_label,
+        version_date=version_date,
+        is_latest=is_latest,
     )
 
 
@@ -87,11 +103,13 @@ async def search_chunks(
     exact: bool = False,
     iterative_scan: Literal["off", "relaxed_order", "strict_order"] = "off",
     ef_search: int | None = None,
+    latest_only: bool = False,
 ) -> list[RetrievedChunk]:
     """Vector-only search, or hybrid (vector + pg_trgm, RRF) when `query_text` is given.
 
     `classifications` (external-LLM mode) keeps only documents with one of these corpus
-    classifications; documents without one are excluded.
+    classifications; documents without one are excluded. `latest_only` drops documents that a
+    newer edition replaced (documents.is_latest = false); both channels share the filter.
     """
     if exact:
         await session.execute(text("SET LOCAL enable_indexscan = off"))
@@ -102,7 +120,14 @@ async def search_chunks(
     if ef_search is not None and not exact:
         await session.execute(text(f"SET LOCAL hnsw.ef_search = {int(ef_search)}"))
     distance = Chunk.embedding.cosine_distance(query_embedding)
-    columns = [Chunk, Document.file_name, (1 - distance).label("score")]
+    columns = [
+        Chunk,
+        Document.file_name,
+        Document.version_label,
+        Document.version_date,
+        Document.is_latest,
+        (1 - distance).label("score"),
+    ]
     lexical = func.word_similarity(query_text, Chunk.text) if query_text else None
     if lexical is not None:
         columns.append(lexical.label("lexical"))
@@ -120,10 +145,12 @@ async def search_chunks(
         stmt = stmt.where(Document.corpus == corpus)
     if classifications is not None:
         stmt = stmt.where(Document.classification.in_(sorted(classifications)))
+    if latest_only:
+        stmt = stmt.where(Document.is_latest.is_(True))
 
     if lexical is None:
         rows = (await session.execute(stmt.order_by(distance).limit(top_k))).all()
-        return [_to_chunk(chunk, name, score, None) for chunk, name, score in rows]
+        return [_to_chunk(*row) for row in rows]
 
     candidates = max(top_k * 4, 20)
     by_vector = (await session.execute(stmt.order_by(distance).limit(candidates))).all()

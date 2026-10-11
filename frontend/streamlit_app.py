@@ -42,6 +42,15 @@ def corpus_label(name: str | None, classification: str | None, external_allowed:
     return f"{name or '(이름 없음)'} · {classification or '분류 없음'} · {scope}"
 
 
+def version_text(item: dict[str, Any]) -> str:
+    """ " · R3 (2025-01-06)" for an edition, "" without one; old editions are marked."""
+    label, when = item.get("versionLabel"), item.get("versionDate")
+    shown = " ".join(x for x in (label, f"({when})" if when else None) if x)
+    if not shown:
+        return "" if item.get("isLatest", True) else " · 옛 판"
+    return f" · {shown}" + ("" if item.get("isLatest", True) else " · 옛 판")
+
+
 corpora_info = api("GET", "/api/corpora") or {"corpora": [], "folders": [], "llmProvider": "?"}
 
 with st.sidebar:
@@ -139,8 +148,18 @@ with tab_ask:
             "이 코퍼스의 문서가 검색되지 않습니다."
         )
     top_k = st.slider("top-k", 1, 10, 5)
+    include_old = st.checkbox(
+        "옛 판 포함",
+        help="기본은 문서의 최신판만 검색합니다. 켜면 새 판으로 대체된 옛 판도 검색하고, "
+        "옛 판이 인용되면 답 아래에 경고를 붙입니다.",
+    )
     if st.button("질문하기", type="primary") and question.strip():
-        body = {"question": question, "topK": top_k, "corpus": corpus}
+        body = {
+            "question": question,
+            "topK": top_k,
+            "corpus": corpus,
+            "includeSuperseded": include_old,
+        }
         with st.spinner("검색 및 답변 생성 중..."):
             result = api("POST", "/api/ask", json=body)
             retrieved = api("POST", "/api/retrieve", json=body)
@@ -150,6 +169,8 @@ with tab_ask:
             elif result.get("partial"):
                 st.info(f"부분 답변: {result.get('caveat') or ''}")
             st.markdown(result["answer"])
+            if result.get("supersededWarning"):
+                st.warning(result["supersededWarning"])
             st.subheader("출처")
             for s in result["sources"]:
                 loc = " · ".join(
@@ -157,7 +178,10 @@ with tab_ask:
                     for x in (s.get("sectionTitle"), s.get("pageNumber") and f"p.{s['pageNumber']}")
                     if x
                 )
-                st.write(f"- {s['fileName']} / {loc} (chunk {s['chunkIndex']}, score {s['score']})")
+                st.write(
+                    f"- {s['fileName']}{version_text(s)} / {loc} "
+                    f"(chunk {s['chunkIndex']}, score {s['score']})"
+                )
             if not result["sources"]:
                 st.write("- (없음)")
             lat = result["latencyMs"]
@@ -170,7 +194,10 @@ with tab_ask:
         if retrieved:
             with st.expander("검색된 chunk 미리보기"):
                 for c in retrieved["chunks"]:
-                    st.markdown(f"**{c['fileName']}** · score `{c['score']}` · {c['metadata']}")
+                    meta = c["metadata"]
+                    st.markdown(
+                        f"**{c['fileName']}**{version_text(meta)} · score `{c['score']}` · {meta}"
+                    )
                     st.text(c["text"][:600])
 
 with tab_dicom:

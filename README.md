@@ -61,7 +61,7 @@ backend/app/
               deid_policy.yaml (사이트 정책) · scope_exemplars.yaml (B6 분류기 예시 80개)
   cli/        dicom_scan.py (폴더 일괄 검사)
 backend/alembic/versions/  0001_initial_schema · 0002_ask_log_llm_usage · 0003_pg_trgm
-                           0004_embedding_model_tracking · 0005_document_corpus
+                           0004_embedding_model_tracking · 0005_document_corpus · 0007_document_versions
 frontend/streamlit_app.py · no_egress_entrypoint.py (폐쇄망 ui: default route 제거 후 권한 하강)
 eval/       questions.yaml (toy 25문항) · public_questions.yaml (공개 99문항) · scope_heldout.yaml (B6 61문항)
             eval_metrics.py · run_eval.py · run_scope_eval.py · tune_gate.py(rerank 게이트 dev 조정) · results/ (날짜·설정·코퍼스 해시별 결과, 커밋함)
@@ -386,6 +386,10 @@ public 99문항(답 79 / 거절 20)을 **한 색인**에서 실행했습니다. 
 | 질문 embedding p50 / 적재 메모리(`ollama ps`) | 16.9 ms / 673 MB | 13.3 ms / 346 MB | 13.4 ms / 346 MB | 13.3 ms / 346 MB |
 
 270m이 검색·B6에서 낮아 **기본값은 bge-m3 그대로**입니다. Citation·거절 정확도 등 생성 의존 지표와 전체 표는 ADR에 있고, 생성 지표는 0.24.0과 런타임이 달라 직접 비교하지 않습니다. **측정 안 함**: 문서별 실제 제목 접두어(`title: none`만 측정), 128차원, 740m(텍스트 벡터가 270m과 비트 단위로 같아 생략)와 그 멀티모달.
+
+### 문서 판(edition): 최신판만 검색 (공개 코퍼스, 2026-10-11)
+
+`corpus/public/.corpus.yaml`의 `versions:`로 ICH E6(R2) 안내서를 옛 판으로 표시하고 같은 색인에서 최신판 필터를 끔/켬 각 2회 비교했습니다(99문항, bge-m3, exact, Ollama 0.40.2). E6(R3) 7문항의 top-5에서 R2 chunk가 27개 → 0개가 됐고 Citation 정확도가 86.7/85.3% → 90.7%였습니다. 한계: 옛 판 문서를 이름으로 지목한 질문(p32)도 기본값이 막으므로 그때는 "옛 판 포함"을 켜야 합니다. 파일명 추정은 폴더·판 토큰 외 이름이 같을 때만 묶고 파일명 날짜는 숨김 판단에 쓰지 않습니다(날짜는 manifest에 적은 것끼리만 비교). 이 7문항은 실패를 본 뒤 고친 것이라 "실패 재확인"이며, 정답 파일이 R2 안내서인 p32~p34는 hit가 3문항 줄어 hit@5가 96.2% → 94.9%입니다(답은 R3로 나옴, 평가셋은 그대로). 결과: `eval/results/2026-10-11_public_*latest*`, [ADR 0006](docs/decisions/0006-document-versions.md), 경과: [docs/journey.md](docs/journey.md) §16.
 
 ### 실제 업무 문서: 변환 없이 바로 색인 (로컬 전용, 2026-10-11)
 

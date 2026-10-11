@@ -13,8 +13,16 @@ def load_prompt(prompts_dir: Path, name: str) -> str:
     return (prompts_dir / name).read_text(encoding="utf-8").strip()
 
 
+def format_version(chunk: RetrievedChunk) -> str | None:
+    """The edition shown next to the file name: its label, else its date, else nothing."""
+    if chunk.version_label:
+        return chunk.version_label
+    return chunk.version_date.isoformat() if chunk.version_date else None
+
+
 def format_source_label(chunk: RetrievedChunk) -> str:
-    parts = [chunk.file_name]
+    version = format_version(chunk)
+    parts = [f"{chunk.file_name} · {version}" if version else chunk.file_name]
     if chunk.page_number is not None:
         parts.append(f"p.{chunk.page_number}")
     if chunk.section_title:

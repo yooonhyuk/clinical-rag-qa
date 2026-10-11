@@ -1,7 +1,7 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import CHAR, DateTime, Index, Integer, Text
+from sqlalchemy import CHAR, Boolean, Date, DateTime, Index, Integer, Text, false, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
@@ -39,6 +39,15 @@ class Document(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     # licensed-local-only ...). With an external LLM provider only allowed classes are searched;
     # NULL (no marker, or indexed before Alembic 0006) counts as local-only.
     classification: Mapped[str | None] = mapped_column(Text)
+    # Edition (services/doc_versions.py, Alembic 0007). `doc_family` groups the editions of one
+    # document inside a corpus; `is_latest` is recomputed per corpus after every index run and
+    # search reads only latest editions by default. `version_source`: manifest | filename | none.
+    doc_family: Mapped[str | None] = mapped_column(Text)
+    version_label: Mapped[str | None] = mapped_column(Text)
+    version_date: Mapped[date | None] = mapped_column(Date)
+    version_source: Mapped[str] = mapped_column(Text, default="none", server_default="none")
+    version_superseded: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    is_latest: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
 
     chunks: Mapped[list["Chunk"]] = relationship(  # noqa: F821
         back_populates="document", cascade="all, delete-orphan", passive_deletes=True
