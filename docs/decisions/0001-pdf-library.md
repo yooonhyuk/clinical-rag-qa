@@ -39,3 +39,10 @@ MVP-1은 PyMuPDF(`pymupdf`)로 PDF를 읽었습니다. 공개 코퍼스(B5)를 �
 - 레이아웃 정보(폰트 크기·굵기)가 없으므로 헤딩은 번호 패턴(`I.`, `A.`, `4.2.1`, `Ⅳ.`, `1.1.1.`, `제3장`, `가.`)으로만 찾습니다. 번호 없는 굵은 소제목(FDA Appendix A의 "• Readers and their background qualifications." 등)은 섹션으로 나뉘지 않고, 이 경우 인용은 페이지 번호에 의존합니다.
 - PDF 표는 구조 없이 텍스트로 나옵니다(예: 식약처 AI 가이드라인의 관찰항목 표). 구조가 있는 표는 JATS XML과 DICOM HTML에서만 행 단위로 처리합니다.
 - 오프라인 번들의 `wheels/`(개발·테스트용, `--all-groups`)에는 여전히 PyMuPDF wheel이 들어갑니다. 테스트를 폐쇄망에서 돌릴 때만 필요하며 api 런타임에는 쓰지 않습니다.
+
+## 추가 (2026-10-11): 암호화 PDF — `cryptography`를 기본 의존성으로
+
+- 배경: 실제 업무 문서 중 서명본 PDF 일부는 **열기 암호가 없고 권한(소유자) 암호만** 있는 AES PDF입니다. pypdf는 빈 암호로 여는 것을 이미 시도하지만, AES 복호화에는 `cryptography`가 필요해서 위의 "차이점 3"대로 `ENCRYPTED_PDF`로 빠졌습니다.
+- 결정: `cryptography`(50.0.2, 의존성 cffi 2.1.1·pycparser 3.11, PyPI)를 기본 의존성에 추가합니다(사용자 승인 2026-10-11). 오프라인 번들은 lock에서 wheel을 가져오므로 번들 스크립트는 바꾸지 않습니다.
+- 동작: 열기 암호가 없는 AES PDF는 열립니다(`test_aes_pdf_with_owner_password_only_opens`). 열기 암호가 있는 PDF는 이전처럼 `ENCRYPTED_PDF`입니다(`test_encrypted_pdf_fails`). 암호를 풀어 보는 시도는 하지 않습니다.
+- 합성 시험 파일: `samples/office/demo-signed-protocol.pdf`(AES-128, 권한 암호만. `scripts/generate_sample_office.py`).

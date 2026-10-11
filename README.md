@@ -2,7 +2,7 @@
 
 **Local-first 의료문서 RAG + DICOM Tag Analyzer** — 포트폴리오 프로젝트 (MVP-1)
 
-임상시험 문서(Markdown/TXT/텍스트 PDF/JATS XML/HTML)를 로컬에서 인덱싱하고, 질문에 **출처를 붙여** 답하며, 근거가 부족하면 **답변을 거절**합니다.
+임상시험 문서(Markdown/TXT/텍스트 PDF/JATS XML/HTML/DOCX/XLSX)를 로컬에서 인덱싱하고, 질문에 **출처를 붙여** 답하며, 근거가 부족하면 **답변을 거절**합니다.
 DICOM 파일은 픽셀을 읽지 않고 태그만 분석해, DICOM 표준 원문(PS3.3 / PS3.15, 2026d)에서 생성한 규칙으로 **표준 적합성(Layer 1)** 과 **비식별화(Layer 2)** 를 검사합니다.
 기본 구성은 외부 네트워크 없이 동작하며, 폐쇄망 설치용 오프라인 번들을 포함합니다.
 
@@ -45,7 +45,7 @@ flowchart LR
 backend/app/
   main.py · config.py · db.py · container.py (composition root)
   api/        documents.py rag.py dicom.py health.py deps.py
-  services/   document_loader · text_extractor(형식 분기) · pdf_extractor(pypdf) · jats_extractor
+  services/   document_loader · text_extractor(형식 분기) · pdf_extractor(pypdf) · docx_extractor · xlsx_extractor · jats_extractor
               html_extractor · headings(번호 헤딩 인식) · table_rows · chunker · embedding_service
               vector_search_service · rag_service · prompt_builder
               embedding_schema · indexing_pipeline
@@ -540,6 +540,7 @@ HYBRID_SEARCH=true  make eval
 - **실행 범위**: 전체 `docker compose build/up`(호스트 Ollama 사용), 오프라인 번들 생성·설치·`verify-offline.sh`는 macOS arm64(Docker Desktop)에서만 실행했습니다. linux/amd64 번들과 Linux 엔진에서는 아직 돌려보지 않았습니다. 폐쇄망 검증은 VM 메모리 때문에 gemma4:e4b 대신 medgemma:4b로 했습니다(gemma4:e4b는 컨테이너 메모리 약 12GB 이상 필요). RAG 평가 수치는 호스트 Ollama 기준입니다.
 - **폐쇄망 UI 포트**: ui는 `ui_edge`에 연결되지만 default route를 지워 외부로 나갈 수 없습니다([이슈 003](docs/issues/003-offline-ui-egress.md)). 남은 한계는 다음과 같습니다. 호스트 관리자가 `docker exec -u 0`으로 들어가면 route를 다시 추가할 수 있고, ui는 `ui_edge` 서브넷(bridge gateway = Docker 호스트)에는 닿습니다. IPv6는 다루지 않습니다(compose 기본값은 꺼짐).
 - **OUT_OF_SCOPE 판별**은 정규식 + 예시 기반 kNN입니다. held-out 61문항에서 재현율 92%, 오거절 2.8%로, 놓치는 요청과 잘못 거절하는 문서 질문이 남아 있습니다(아래 B6 표). 임계값은 bge-m3와 현재 예시에 맞춘 값이라 모델이나 예시를 바꾸면 `make scope-eval`로 다시 정해야 합니다. 2·3단계 거절과 시스템 프롬프트로 한 번 더 막습니다.
+- **Office 문서**: `.docx`(제목 스타일 → 섹션 경로, 표 → `열이름: 값` 행, 변경 추적 삭제분·머리말·각주 제외)와 `.xlsx`(시트 하나 = 섹션, 머리글 행 탐지, 날짜 ISO 변환)는 표준 라이브러리만으로 읽습니다. 쪽 번호가 없어 인용은 섹션 제목/시트 이름입니다. 열기 암호가 걸린 파일은 `ENCRYPTED_FILE`, `.doc`는 "docx로 저장 후 다시 넣으세요" 안내와 함께 `UNSUPPORTED_FILE_TYPE`입니다. 권한 암호만 있는 AES PDF는 `cryptography` 덕분에 열립니다([ADR 0001](docs/decisions/0001-pdf-library.md)). 합성 시험 파일은 `samples/office/`입니다. 손상·악성 파일 방어로 DTD/엔티티를 거부하고, 압축 해제 총량(256MB)·part별 압축률(1MB 초과 part는 100배 이하)·추출 텍스트 예산(max(8MB, 해제 바이트의 2배))·중첩 깊이(100)·표 폭(1,000열)·시트 수(256)에 상한을 둡니다. 넘으면 `CORRUPTED_FILE`이며, 같은 내용을 수백 번 반복한 문서처럼 압축률이 100배를 넘는 정상 파일도 거부될 수 있습니다.
 - **chunking**은 섹션 단위(헤딩 번호·JATS `sec`·HTML `h1~h6`)에 문자 수 기준 분할입니다. JATS·HTML 표는 행 단위(`헤더: 값`)로 처리하지만 PDF 표는 구조 없이 텍스트로 들어갑니다. PDF 헤딩은 번호 패턴으로만 찾으므로 번호 없는 소제목(FDA Appendix A의 글머리 소제목 등)은 섹션으로 나뉘지 않고 페이지 번호로만 위치를 표시합니다([ADR 0001](docs/decisions/0001-pdf-library.md)).
 - **공개 평가셋의 한계**: 99문항은 한 사람이 문서를 읽고 쓴 것이고, 질문 표현이 원문 문장과 가까워 실제 사용자 질문보다 쉬울 수 있습니다. 근거 문장 위치는 테스트로 검증하지만 정답 문구(`answer_key`)의 채점은 키워드(`must_include`)와 인용 위치로만 합니다(LLM 채점 없음). 하이브리드는 한 번, 벡터 단독은 두 번 실행했습니다.
 - **reranker·생성 모델 비교는 Apple M5(MPS) 호스트에서만** 측정했습니다. CPU 전용 linux/amd64 장비의 지연, reranker를 넣은 api 이미지와 오프라인 번들, 새 held-out으로 검증한 rerank 게이트는 아직 없습니다. 기본 생성 모델 gemma4:e4b는 실행 크기가 약 10.7GB라 오프라인 장비(또는 Docker VM)에 12GB 이상 메모리가 필요합니다.

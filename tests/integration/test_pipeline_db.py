@@ -25,7 +25,7 @@ def corpus(tmp_path: Path, sample_docs_dir: Path) -> Path:
     root = tmp_path / "corpus"
     shutil.copytree(sample_docs_dir, root)
     (root / "empty.md").write_text("  \n", encoding="utf-8")
-    (root / "notes.docx").write_bytes(b"PK\x03\x04 not supported in MVP-1")
+    (root / "notes.pptx").write_bytes(b"PK\x03\x04 not supported in MVP-1")
     shutil.copy(root / "qa-checklist.md", root / "qa-checklist-copy.md")
     return root
 
@@ -49,7 +49,7 @@ async def test_index_statuses_failures_and_duplicates(session_factory, corpus) -
     async with session_factory() as s:
         docs = {d.file_name: d for d in (await s.scalars(select(Document))).all()}
         assert docs["empty.md"].error_type == "EMPTY_DOCUMENT"
-        assert docs["notes.docx"].error_type == "UNSUPPORTED_FILE_TYPE"
+        assert docs["notes.pptx"].error_type == "UNSUPPORTED_FILE_TYPE"
         assert docs["dicom-upload-guide.md"].status == DocumentStatus.INDEXED
         # identical content -> only the first file (by path order) gets a row
         pair = {"qa-checklist.md", "qa-checklist-copy.md"}
