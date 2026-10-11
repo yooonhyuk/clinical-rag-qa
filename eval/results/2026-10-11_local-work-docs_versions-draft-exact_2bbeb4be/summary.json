@@ -1,0 +1,85 @@
+{
+ "what": "local-only work documents (87): latest-only filter under different edition sources. Aggregates only: no file names, questions, answers or text. Reference = manual list of 16 latest files.",
+ "env": {
+  "ollama": "0.40.2",
+  "embedding": "bge-m3",
+  "vector_search": "exact",
+  "reranker": "none",
+  "top_k": 5,
+  "questions_with_gold": 42,
+  "note": "one index; is_latest set per scenario, then retrieval"
+ },
+ "before_two_edition_fix_main_55e8894": {
+  "hidden_manual_latest": 2,
+  "hidden_manual_old": 10,
+  "filter_off": {
+   "gold_top5": 21,
+   "n": 42,
+   "old_chunk_share": 0.795,
+   "questions_with_old_chunk": 40
+  },
+  "filter_on": {
+   "gold_top5": 24,
+   "n": 42,
+   "old_chunk_share": 0.776,
+   "questions_with_old_chunk": 40
+  }
+ },
+ "after": {
+  "scenarios": {
+   "inference": {
+    "hidden_manual_latest": 0,
+    "hidden_manual_old": 9,
+    "kept_manual_old": 62
+   },
+   "draft": {
+    "hidden_manual_latest": 0,
+    "hidden_manual_old": 13,
+    "kept_manual_old": 58
+   },
+   "draft_dates": {
+    "hidden_manual_latest": 0,
+    "hidden_manual_old": 24,
+    "kept_manual_old": 47
+   },
+   "reviewed": {
+    "hidden_manual_latest": 0,
+    "hidden_manual_old": 71,
+    "kept_manual_old": 0
+   }
+  },
+  "retrieval": {
+   "filter_off": {
+    "gold_top5": 21,
+    "n": 42,
+    "old_chunk_share": 0.795
+   },
+   "on_inference": {
+    "gold_top5": 24,
+    "n": 42,
+    "old_chunk_share": 0.752
+   },
+   "on_draft": {
+    "gold_top5": 26,
+    "n": 42,
+    "old_chunk_share": 0.743
+   },
+   "on_draft_dates": {
+    "gold_top5": 26,
+    "n": 42,
+    "old_chunk_share": 0.738
+   },
+   "on_reviewed": {
+    "gold_top5": 39,
+    "n": 42,
+    "old_chunk_share": 0.0
+   }
+  },
+  "draft": {
+   "date_candidates": 33,
+   "edits_draft_to_reviewed": 58,
+   "edits_draft_dates_to_reviewed": 47
+  }
+ },
+ "not_measured": "answer correctness, a latest-list manifest format, reranker on"
+}
