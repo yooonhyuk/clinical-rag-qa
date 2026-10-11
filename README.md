@@ -391,6 +391,14 @@ public 99문항(답 79 / 거절 20)을 **한 색인**에서 실행했습니다. 
 
 `corpus/public/.corpus.yaml`의 `versions:`로 ICH E6(R2) 안내서를 옛 판으로 표시하고 같은 색인에서 최신판 필터를 끔/켬 각 2회 비교했습니다(99문항, bge-m3, exact, Ollama 0.40.2). E6(R3) 7문항의 top-5에서 R2 chunk가 27개 → 0개가 됐고 Citation 정확도가 86.7/85.3% → 90.7%였습니다. 한계: 옛 판 문서를 이름으로 지목한 질문(p32)도 기본값이 막으므로 그때는 "옛 판 포함"을 켜야 합니다. 파일명 추정은 폴더·판 토큰 외 이름이 같을 때만 묶고 파일명 날짜는 숨김 판단에 쓰지 않습니다(날짜는 manifest에 적은 것끼리만 비교). 이 7문항은 실패를 본 뒤 고친 것이라 "실패 재확인"이며, 정답 파일이 R2 안내서인 p32~p34는 hit가 3문항 줄어 hit@5가 96.2% → 94.9%입니다(답은 R3로 나옴, 평가셋은 그대로). 결과: `eval/results/2026-10-11_public_*latest*`, [ADR 0006](docs/decisions/0006-document-versions.md), 경과: [docs/journey.md](docs/journey.md) §16.
 
+**판 정보 초안 만들기.** 파일명 추정만으로는 이름이 판 말고도 다른 문서나 판 번호가 같은 문서를 못 묶으므로, 초안을 만들어 확인합니다(판이 둘인 이름 `v2.1 v2.2`는 변경 문서로 보고 판으로 읽지 않습니다).
+```bash
+uv run --project backend python scripts/draft_versions.py ~/my-corpus --out /tmp/versions.draft.yaml   # 요약은 stderr
+# 항목마다 `# 근거:`와 `# 확인 필요`가 달려 있습니다. 고친 뒤 코퍼스 루트에 저장합니다.
+cp /tmp/versions.draft.yaml ~/my-corpus/.versions.yaml   # 형식은 .corpus.yaml의 versions: 와 같음
+```
+초안은 숨김을 확정하지 않습니다(`superseded` 없음). 파일명 날짜는 `# date: ...` 주석으로만 적혀 있어, 그대로 적용하면 판 번호로만 최신이 정해지고 날짜로는 아무것도 숨겨지지 않습니다(같은 문서의 판이 맞을 때만 그 줄의 `# ` 두 글자만 지우세요. 날짜만 다른 회의록·방문 보고서는 별개 문서입니다). `.corpus.yaml` 항목이 먼저 매칭되고, `.versions.yaml`이 깨져 있으면(없는 날짜 `2025-02-30`, 잘못된 `!!` 태그 포함) 경고만 남기고 추정으로 대체합니다. 지우고 재색인하면 추정으로 돌아갑니다. 흐름: [ADR 0006](docs/decisions/0006-document-versions.md).
+
 ### 실제 업무 문서: 변환 없이 바로 색인 (로컬 전용, 2026-10-11)
 
 실제 업무 문서 87건(비공개, 로컬에서만 측정, 집계만 공개)을 docx·xlsx 추출기(#17, #20) 이후 다시 넣었습니다. bge-m3, exact 검색, reranker 없음, Ollama 0.40.2. 결과: `eval/results/2026-10-11_local-work-docs_*`, 경과: [docs/journey.md](docs/journey.md) §15.

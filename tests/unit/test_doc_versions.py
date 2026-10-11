@@ -314,3 +314,52 @@ def test_version_key_and_compare_helpers() -> None:
         0,
     )
     assert compare_versions(VersionInfo(label="v1"), VersionInfo(label="R1")) is None
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Change table v2.1 v2.2.xlsx",
+        "Change table v2.2 v3.0.xlsx",
+        "Plan Rev5 to Rev6.docx",
+        "Plan (R2) (R3).docx",
+        "Plan E6R2 E6R3.pdf",
+    ],
+)
+def test_two_tokens_of_one_kind_is_a_change_document_and_stays_standalone(name: str) -> None:
+    assert infer_from_filename(name).family is None
+    assert infer_from_filename(name).label is None
+
+
+def test_change_documents_never_hide_each_other_or_an_edition() -> None:
+    names = (
+        "Change table v2.1 v2.2.xlsx",
+        "Change table v2.2 v3.0.xlsx",
+        "Protocol v2.1.docx",
+        "Protocol v2.2.docx",
+    )
+    assert _latest(*names) == {
+        "Change table v2.1 v2.2.xlsx": True,
+        "Change table v2.2 v3.0.xlsx": True,
+        "Protocol v2.1.docx": False,
+        "Protocol v2.2.docx": True,
+    }
+
+
+def test_change_document_keeps_its_filename_date() -> None:
+    info = infer_from_filename("Change table v2.1 v2.2 20250915.xlsx")
+    assert (info.family, info.date, info.source) == (None, date(2025, 9, 15), "filename")
+
+
+def test_parse_manifest_ignores_odd_value_types_without_raising() -> None:
+    odd = [
+        {"match": 5, "family": "G"},
+        {"match": "a.md", "family": ["x"]},
+        {"match": "b.md", "family": "G", "version": {"k": 1}, "date": "2025-02-30"},
+        {"match": "c.md", "family": "G", "date": 20250101},
+        "text",
+        None,
+    ]
+    entries = parse_manifest(odd)
+    assert [e.match for e in entries] == ["b.md", "c.md"]
+    assert all(e.date is None for e in entries)
