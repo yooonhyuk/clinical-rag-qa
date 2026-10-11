@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     # Off by default since bge-m3: no retrieval gain on the eval set (docs/issues/001); keep it
     # on for embedding models without Korean vocabulary.
     hybrid_search: bool = False
+    # Search only the latest edition of each document (documents.is_latest, docs/decisions/0006).
+    # A request can add the older ones with include_superseded; false turns the filter off.
+    search_latest_only: bool = True
     rrf_k: int = Field(default=60, ge=1)
     # docs/issues/009: hnsw = approximate (index, default), exact = sequential scan with exact
     # cosine order (slower; reproducible regardless of what else is in the table).

@@ -1,6 +1,6 @@
 # 005. ICH E6(R3) 질문이 식약처 ICH GCP 안내서(E6(R2) 국·영문 병기)로 검색됨 — 버전 혼동과 한국어 쏠림
 
-- 상태: 미해결 (reranker로 시도했으나 더 나빠짐, 2026-10-07)
+- 상태: 부분 해결 (판 메타데이터 + 최신판 기본 검색, 2026-10-11 — 아래 "최신판 필터" 절. chunk 머리말·질문 속 판 이름 필터는 아직)
 - GitHub: https://github.com/yooonhyuk/clinical-rag-qa/issues/6
 - 발견: 2026-10-07, 공개 코퍼스 첫 평가(`eval/public_questions.yaml`, bge-m3 · 벡터 단독)
 - 영향 범위: 같은 규정의 여러 판·번역본이 한 코퍼스에 있을 때의 검색과 인용
@@ -60,3 +60,12 @@ make eval EVAL_DATABASE_URL=postgresql+asyncpg://clinical:clinical@localhost:554
 
 - cross-encoder는 한국어 질문에 국문 R2 번역 chunk를 더 높게 매겼습니다. p13(영어 질문)과 p15가 hit → miss가 됐고, p13은 거절로 바뀌었습니다.
 - chunk에 문서 판(R2/R3) 정보가 없다는 원인 2는 순위 모델로 해결되지 않습니다. 다음 단계는 그대로 "chunk 머리말에 문서 식별 정보 추가"와 "질문의 판 이름으로 필터/가중치"입니다.
+
+## 최신판 필터 (2026-10-11, [ADR 0006](../decisions/0006-document-versions.md))
+
+`corpus/public/.corpus.yaml`에 ICH E6 family를 명시하고(02 = R3, 05 = R2 `superseded`) 검색 기본값을 최신판만으로 바꿨습니다. 같은 색인, exact, gemma4:e4b, 필터 끔/켬 각 2회(`eval/results/2026-10-11_public_*latest*`).
+
+- p10~p16 top-5의 R2 chunk 27개 → 0개, R3 8개 → 29개. 파일 hit 5 → 7, 인용 정확 2 → 7. 두 번 모두 같았습니다.
+- 편향 주의: 이 7문항은 실패를 본 뒤 고친 것이라 "실패 재확인"으로만 읽습니다.
+- 잃은 것: 정답 파일이 05번인 p32~p34는 hit가 miss가 됐고(전체 hit@5 96.2% → 94.9%) 답은 R3 chunk로 나왔습니다. p32는 옛 판 안내서를 이름으로 지목한 질문이라 기본값의 한계이고("옛 판 포함"으로 우회), p33·p34는 평가셋 정의 문제입니다.
+- 한국어 쏠림(원인 3)과 chunk 머리말(원인 2)은 해결하지 않았습니다. 질문 속 "R3"로 거르는 것도 이번 범위 밖입니다.

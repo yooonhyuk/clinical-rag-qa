@@ -149,6 +149,7 @@ def build_container(
             inline_instructions=settings.rag_prompt_variant == "inline-en",
             min_score=settings.min_relevance_score,
             hybrid=settings.hybrid_search,
+            latest_only=settings.search_latest_only,
             rrf_k=settings.rrf_k,
             scope=build_scope_classifier(settings, embeddings),
             reranker=reranker,

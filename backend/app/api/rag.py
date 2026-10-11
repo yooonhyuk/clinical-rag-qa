@@ -24,6 +24,9 @@ def _source(chunk: RetrievedChunk) -> SourceOut:
         chunk_index=chunk.chunk_index,
         score=round(chunk.score, 4),
         rerank_score=None if chunk.rerank_score is None else round(chunk.rerank_score, 4),
+        version_label=chunk.version_label,
+        version_date=chunk.version_date,
+        is_latest=chunk.is_latest,
     )
 
 
@@ -35,6 +38,7 @@ async def ask(body: QuestionRequest, container: ContainerDep, session: SessionDe
         top_k=body.top_k or container.settings.top_k,
         file_type=body.file_type,
         corpus=body.corpus,
+        include_superseded=body.include_superseded,
     )
     return AskResponse(
         answer=result.answer,
@@ -43,6 +47,7 @@ async def ask(body: QuestionRequest, container: ContainerDep, session: SessionDe
         refusal_reason=result.refusal_reason,
         partial=result.partial,
         caveat=result.caveat,
+        superseded_warning=result.superseded_warning,
         citation_mode=result.citation_mode,
         latency_ms=LatencyOut(retrieval=result.retrieval_ms, generation=result.generation_ms),
         llm=(
@@ -68,6 +73,7 @@ async def retrieve(
         top_k=body.top_k or container.settings.top_k,
         file_type=body.file_type,
         corpus=body.corpus,
+        include_superseded=body.include_superseded,
     )
     return RetrieveResponse(
         chunks=[
@@ -82,6 +88,9 @@ async def retrieve(
                     "pageNumber": c.page_number,
                     "sectionTitle": c.section_title,
                     "rerankScore": c.rerank_score,
+                    "versionLabel": c.version_label,
+                    "versionDate": c.version_date.isoformat() if c.version_date else None,
+                    "isLatest": c.is_latest,
                 },
             )
             for c in chunks

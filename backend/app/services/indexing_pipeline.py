@@ -21,9 +21,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.models import Chunk, Document, DocumentStatus, IndexJob
 from app.models.base import utcnow
 from app.services.chunker import chunk_sections
+from app.services.doc_versions import (
+    VersionInfo,
+    latest_flags,
+    parse_manifest,
+    resolve_version,
+)
 from app.services.document_loader import DiscoveredFile, scan_documents
 from app.services.embedding_service import EmbeddingService
-from app.services.llm_guardrail import corpus_classification, corpus_include, corpus_name
+from app.services.llm_guardrail import (
+    corpus_classification,
+    corpus_include,
+    corpus_name,
+    read_marker,
+)
 from app.services.llm_types import LLMError
 from app.services.text_extractor import ExtractionError, extract
 
@@ -83,6 +94,7 @@ class IndexingPipeline:
         files = await asyncio.to_thread(scan_documents, root, include)
         corpus = corpus or corpus_name(root, self._marker_file)
         classification = corpus_classification(root, self._marker_file)
+        manifest = parse_manifest(read_marker(root, self._marker_file).get("versions"))
 
         async with self._session_factory() as session:
             job = IndexJob(
@@ -105,7 +117,10 @@ class IndexingPipeline:
 
         async def bounded(f: DiscoveredFile) -> FileOutcome:
             async with limiter:
-                return await self._process(f, corpus, classification)
+                version = resolve_version(
+                    f.file_name, f.path.relative_to(root).as_posix(), manifest
+                )
+                return await self._process(f, corpus, classification, version)
 
         status = "COMPLETED"
         try:
@@ -113,6 +128,8 @@ class IndexingPipeline:
         except Exception:  # defensive: _process converts per-file errors into outcomes
             logger.exception("Indexing job crashed")
             status = "FAILED"
+        if corpus is not None:
+            await recompute_latest(self._session_factory, corpus)
 
         async with self._session_factory() as session:
             job = await session.get_one(IndexJob, job.id)
@@ -128,10 +145,14 @@ class IndexingPipeline:
             return job
 
     async def _process(
-        self, f: DiscoveredFile, corpus: str | None = None, classification: str | None = None
+        self,
+        f: DiscoveredFile,
+        corpus: str | None = None,
+        classification: str | None = None,
+        version: VersionInfo | None = None,
     ) -> FileOutcome:
         async with self._session_factory() as session:
-            doc, duplicate_of = await self._register(session, f, corpus, classification)
+            doc, duplicate_of = await self._register(session, f, corpus, classification, version)
             if doc is None:
                 return _duplicate(f, duplicate_of)
             try:
@@ -156,6 +177,7 @@ class IndexingPipeline:
         f: DiscoveredFile,
         corpus: str | None = None,
         classification: str | None = None,
+        version: VersionInfo | None = None,
     ) -> tuple[Document | None, str | None]:
         """Create (or reuse a FAILED / other-model) document row. (None, name) on duplicate.
 
@@ -168,12 +190,15 @@ class IndexingPipeline:
             and existing.status != DocumentStatus.FAILED
             and existing.embedding_model == self._embeddings.model
         ):
+            # e.g. a row indexed before Alembic 0005/0006/0007, or a re-marked folder
+            changed = _apply_version(existing, version) if version is not None else False
             if (corpus is not None and existing.corpus != corpus) or (
                 existing.classification != classification
             ):
-                # e.g. a row indexed before Alembic 0005/0006, or a re-marked folder
                 existing.corpus = corpus if corpus is not None else existing.corpus
                 existing.classification = classification
+                changed = True
+            if changed:
                 await session.commit()
             return None, existing.file_name
 
@@ -183,6 +208,8 @@ class IndexingPipeline:
         doc.file_type = f.file_type
         doc.corpus = corpus
         doc.classification = classification
+        if version is not None:
+            _apply_version(doc, version)
         doc.status = DocumentStatus.DISCOVERED
         doc.error_type = None
         doc.error_message = None
@@ -235,6 +262,68 @@ class IndexingPipeline:
         doc.indexed_at = utcnow()
         await session.commit()
         return len(chunks)
+
+
+def _apply_version(doc: Document, version: VersionInfo) -> bool:
+    """Copy the edition metadata onto the row; True if anything changed (is_latest is separate)."""
+    new = (
+        version.family,
+        version.label,
+        version.date,
+        version.source,
+        version.superseded,
+    )
+    old = (
+        doc.doc_family,
+        doc.version_label,
+        doc.version_date,
+        doc.version_source,
+        doc.version_superseded,
+    )
+    if new == old:
+        return False
+    (
+        doc.doc_family,
+        doc.version_label,
+        doc.version_date,
+        doc.version_source,
+        doc.version_superseded,
+    ) = new
+    return True
+
+
+async def recompute_latest(session_factory: async_sessionmaker[AsyncSession], corpus: str) -> int:
+    """Recompute `is_latest` for every INDEXED document of `corpus`; returns how many changed.
+
+    Runs after each index job so adding (or removing) an edition is reflected in the others.
+    Documents that are not INDEXED (failed, half-way) neither hide nor replace anything.
+    """
+    async with session_factory() as session:
+        docs = (
+            await session.scalars(
+                select(Document).where(
+                    Document.corpus == corpus, Document.status == DocumentStatus.INDEXED
+                )
+            )
+        ).all()
+        infos = [
+            VersionInfo(
+                family=d.doc_family,
+                label=d.version_label,
+                date=d.version_date,
+                source=d.version_source,  # type: ignore[arg-type]
+                superseded=d.version_superseded,
+            )
+            for d in docs
+        ]
+        flags = latest_flags(infos, [corpus] * len(docs))
+        changed = 0
+        for doc, flag in zip(docs, flags, strict=True):
+            if doc.is_latest != flag:
+                doc.is_latest = flag
+                changed += 1
+        await session.commit()
+        return changed
 
 
 def _duplicate(f: DiscoveredFile, duplicate_of: str | None) -> FileOutcome:

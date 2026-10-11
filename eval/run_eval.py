@@ -289,6 +289,7 @@ async def run_provider(
             "embedding_query_prefix": settings.embedding_query_prefix,
             "embedding_document_prefix": settings.embedding_document_prefix,
             "hybrid_search": settings.hybrid_search,
+            "search_latest_only": settings.search_latest_only,
             "top_k": top_k,
             "chunk_size": settings.chunk_size,
             "chunk_overlap": settings.chunk_overlap,
