@@ -76,3 +76,4 @@ cp .ai/README.md                        <target>/.ai/
   Reviewer/Tester는 Implementer worktree에서 read-only로 동작하며 각각
   rules/reviewer.md, rules/tester.md 차터를 따른다. dispatch spec에 "너의 역할은
   Reviewer/Tester, .ai/rules/<role>.md 를 따르라"를 명시한다
+- 어느 수준으로 돌릴지는 [rules/project.md](rules/project.md#실행-방식-판정-작업-시작-전-coordinator)의 판정 규칙을 따른다
